@@ -1,0 +1,10 @@
+[user]
+	name = Vijay Nayar
+	email = vnayar@wgen.net
+[color]
+	diff = auto
+	status = auto
+	branch = auto
+	showbranch = auto
+[push]
+	default = tracking
