@@ -5,7 +5,6 @@
 (setq inhibit-splash-screen t)
 (setq default-tab-width 4)
 (setq-default indent-tabs-mode nil)
-;(setq-default show-trailing-whitespace t)
 (setq-default indicate-empty-lines t)
 
 ;; Allow function keys to set dedicated windows for a buffer.
@@ -38,6 +37,14 @@
 ;; Git Settings
 (setenv "GIT_PAGER" "")
 (setenv "GIT_EDITOR" "emacs")
+
+;; General Programming Settings
+(defun my-c-mode-common-hook ()
+  (column-number-mode 1)
+  (show-paren-mode 1)
+  (setq show-trailing-whitespace t)
+  )
+(add-hook 'c-mode-common-hook 'my-c-mode-common-hook)
 
 ;; D Programming Language Settings
 (autoload 'd-mode "d-mode" "Major mode for editing D code." t)
