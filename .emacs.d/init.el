@@ -162,7 +162,7 @@
 (ffap-bindings)
 
 ;; W3M Web-Browsing Settings
-(require 'w3m-load)
+;(require 'w3m-load)
 
 ;; Mac Keyboard Compatibility Fixes
 (setq x-alt-keysym 'meta)  ;; Interpret "Alt" as "Meta"
@@ -172,9 +172,6 @@
 (global-set-key (kbd "<C-S-iso-lefttab>") 'other-frame)
 ; Buffer selection in the same window
 (global-set-key "\C-x\C-b" 'buffer-menu)
-
-;; Google Grok
-(grok-init)
 
 ;; TODO - Make less heavyweight and figure out good usage pattern.
 ;; ECB - Emacs Code Browser
@@ -209,9 +206,9 @@
  '(scroll-bar-mode nil)
  '(show-paren-mode t)
  '(tool-bar-mode nil)
- '(w3m-enable-google-feeling-lucky nil)
- '(w3m-home-page "about:blank")
- '(w3m-session-crash-recovery nil))
+ ;'(w3m-enable-google-feeling-lucky nil)
+ ;'(w3m-home-page "about:blank")
+ ;'(w3m-session-crash-recovery nil))
 (custom-set-faces
  ;; custom-set-faces was added by Custom.
  ;; If you edit it by hand, you could mess it up, so be careful.
