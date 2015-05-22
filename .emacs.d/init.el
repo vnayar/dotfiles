@@ -1,7 +1,5 @@
 ;; Allow us to import custom modules.
 (add-to-list 'load-path "~/.emacs.d/lisp/")
-(add-to-list 'load-path "/google/src/files/head/depot/eng/elisp/")
-(add-to-list 'load-path "/home/build/public/eng/elisp")
 
 ;; Dive through ~/.emacs.d/elpa packages to add subdirs.
 (when (>= emacs-major-version 24)
@@ -62,6 +60,26 @@
             (buffer-name))))
 (global-set-key [f12] 'toggle-current-window-dedication)
 
+;; Initialize windows the way I prefer them at start-up.
+(defun init-windows ()
+  "Split a window into quarters and display the four most recently used buffers."
+  (interactive)
+  (delete-other-windows)
+  (let* ((window_tl (selected-window))
+         (window_tr (split-window-horizontally))
+         (window_bl (split-window-vertically))
+         (window_br (progn (select-window window_tr) (split-window-vertically))))
+    (select-window window_tl)
+    (switch-to-buffer nil)
+    (select-window window_bl)
+    (switch-to-buffer nil)
+    (select-window window_tr)
+    (switch-to-buffer nil)
+    (select-window window_br)
+    (switch-to-buffer nil)
+    (select-window window_tl)))
+(global-set-key (kbd "C-c w") 'init-windows)
+
 ;; Keybindings for navigating windows.
 (global-set-key (kbd "C-c h") 'windmove-left)
 (global-set-key (kbd "C-c j") 'windmove-down)
@@ -78,12 +96,17 @@
               'comint-kill-whole-line)))
 ; Enable colour.
 (add-hook 'comint-mode-hook 'ansi-color-for-comint-mode-on)
-(add-hook 'comint-mode-hook (lambda nil (color-theme-buffer-local 'color-theme-jedit-grey
-                                                                  (current-buffer))))
+(add-hook 'comint-mode-hook
+          (lambda nil (color-theme-buffer-local 'color-theme-arjen
+                                                (current-buffer))))
+
+;; Compilation Mode Settings
+(add-to-list 'auto-mode-alist '("/test\\.log\\'" . compilation-minor-mode))
 (add-hook 'compilation-mode-hook
           (lambda nil
-            (color-theme-buffer-local 'color-theme-aalto-light (current-buffer))))
-(add-hook 'compilation-filter-hook 'ansi-color-for-comint-mode-filter)
+            (color-theme-buffer-local 'color-theme-sitaramv-solaris
+                                      (current-buffer))))
+;(add-hook 'compilation-filter-hook 'ansi-color-for-comint-mode-filter)
 
 ; Limit the max buffer size.
 (setq comint-buffer-maximum-size 1024)
@@ -93,6 +116,21 @@
 ;; Git Settings
 (setenv "GIT_PAGER" "")
 (setenv "GIT_EDITOR" "emacs")
+
+;; PlantUML Mode
+(setq plantuml-jar-path "/opt/plantuml/plantuml.jar")
+(require 'plantuml-mode)
+(defun plantuml-compile ()
+  "Compile a PlantUML file into images."
+  (interactive)
+  (compile (concat "java -jar /opt/plantuml/plantuml.jar " (buffer-file-name))))
+
+;; AUCTeX Settings
+(load "auctex.el" nil t t)
+(load "preview-latex.el" nil t t)
+(setq TeX-auto-save t)
+(setq TeX-parse-self t)
+(setq-default TeX-master nil)
 
 ;; Project Management
 (load "eproject")
@@ -106,6 +144,12 @@
   )
 (add-hook 'c-mode-common-hook 'my-c-mode-common-hook)
 
+;; Java Debugging JSwat Settings
+(remove-hook 'jdb-mode-hook 'google-jdb-fix-comint-prompt)
+(defun jswat ()
+  (interactive)
+  (setq google-jdb-jswat-command "~/scripts/jswat-launcher -jdb")
+  (google-jswat))
 
 ;; Java Programming Language Settings
 ;(require 'malabar-mode)
@@ -113,20 +157,27 @@
 (add-hook 'java-mode-hook
           (lambda ()
             "Treat Java 1.5 @-style annotations as comments."
-            (setq c-comment-start-regexp "(@|/(/|[*][*]?))")
-            (modify-syntax-entry ?@ "< b" java-mode-syntax-table)))
-(add-hook 'java-mode-hook
-          (lambda ()
-            (setq c-basic-offset 2)))
-(add-hook 'java-mode-hook
-          (lambda ()
-            (column-marker-1 100)))
-(add-hook 'java-mode-hook
-          (lambda ()
+            (setq c-comment-start-regexp "\\(@\\|/\\(/\\|[*][*]?\\)\\)")
+            (modify-syntax-entry ?@ "< b" java-mode-syntax-table)
+            (setq c-basic-offset 2)
+            (column-marker-1 100)
+            ;(local-set-key (kbd "C-c i") 'google-imports-add-import-from-tag)
+            (local-set-key (kbd "C-c i") 'google-imports-jade)
             (add-hook 'before-save-hook 'google-imports-organize-imports nil t)))
 
 ;; JavaScript Programming Language Settings
 (add-to-list 'auto-mode-alist '("\\.js\\'" . js2-mode))
+
+;; JSON Pretty Print Function
+(defun json-pretty-print (start end)
+  "Pretty-print the selected region of text."
+  (interactive "r")
+  (shell-command-on-region start end "python -m json.tool" :replace=true)
+)
+
+;; EBNF Settings
+(autoload 'ebnf-mode "ebnf-mode" "Major mode for editing EBNF grammars." t)
+(add-to-list 'auto-mode-alist '("\\.ebnf\\'" . ebnf-mode))
 
 ;; D Programming Language Settings
 (autoload 'd-mode "d-mode" "Major mode for editing D code." t)
