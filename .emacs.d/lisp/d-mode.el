@@ -1,14 +1,15 @@
-;;; d-mode.el --- D Programming Language mode for (X)Emacs
+;;; d-mode.el --- D Programming Language major mode for (X)Emacs
 ;;;               Requires a cc-mode of version 5.30 or greater
 
-;; Author:  2007 William Baxter
+;; Author:  William Baxter
 ;; Contributors:  Andrei Alexandrescu
 ;; Contributors:  Russel Winder
-;; Maintainer:  Russel Winder
+;; Maintainer:  Russel Winder <russel@winder.org.uk>
 ;; Created:  March 2007
-;; Date:  2013-07-22
-;; Version:  2.0.7-SNAPSHOT
+;; Version:  201605041654
 ;; Keywords:  D programming language emacs cc-mode
+
+;;;; NB Version number is date and time yyyymmddhhMM UTC.
 
 ;; This program is free software; you can redistribute it and/or modify
 ;; it under the terms of the GNU General Public License as published by
@@ -25,16 +26,16 @@
 ;; the Free Software Foundation, Inc., 59 Temple Place - Suite 330,
 ;; Boston, MA 02111-1307, USA.
 
-;; Usage:
-;; Put these lines in your .emacs startup file.
+;;; Usage:
+;; Put these lines in your init file.
 ;;   (autoload 'd-mode "d-mode" "Major mode for editing D code." t)
 ;;   (add-to-list 'auto-mode-alist '("\\.d[i]?\\'" . d-mode))
 ;;
 ;; cc-mode version 5.30 or greater is required.
 ;; You can check your cc-mode with the command M-x c-version.
 ;; You can get the latest version of cc-mode at http://cc-mode.sourceforge.net
-;;
-;; Commentary:
+
+;;; Commentary:
 ;;   This mode supports most of D's syntax, including nested /+ +/
 ;;   comments and backquote `string literals`.
 ;;
@@ -42,29 +43,44 @@
 ;;   from scratch.  The previous d-mode was based on cc-mode 5.28 or
 ;;   so.  This version is based on the cc-mode 5.30 derived mode
 ;;   example by Martin Stjernholm, 2002.
-;;
-;;
-;; TODO:
+
+;;; Bugs:
+;; Bug tracking is currently handled using the GitHub issue tracker at
+;; https://github.com/Emacs-D-Mode-Maintainers/Emacs-D-Mode/issues
+
+;;; Versions:
+;;  This mode is available on MELPA which tracks the mainline Git repository on GitHub, so there is a
+;;  rolling release system based on commits to the mainline. For those wanting releases, the repository is
+;;  tagged from time to time and this creates an entry in MELPA Stable and a tarball on GitHub.
+
+;;; Notes:
+
+;;; TODO:
 ;;   Issues with this code are managed via the project issue management
 ;;   on GitHub: https://github.com/Emacs-D-Mode-Maintainers/Emacs-D-Mode/issues?state=open
-;;
-;;
-;; History:
+
+;;; History:
 ;;   History is tracked in the Git repository rather than in this file.
 ;;   See https://github.com/Emacs-D-Mode-Maintainers/Emacs-D-Mode/commits/master
-;;
 
 ;;----------------------------------------------------------------------------
-;; Code:
+;;; Code:
 
 (require 'cc-mode)
+
+;; Needed to prevent
+;;   "Symbol's value as variable is void: compilation-error-regexp-alist-alist" errors
+(require 'compile)
+
+;; The set-difference function is used from the Common Lisp extensions.
+(require 'cl)
 
 ;; These are only required at compile time to get the sources for the
 ;; language constants.  (The cc-fonts require and the font-lock
 ;; related constants could additionally be put inside an
 ;; (eval-after-load "font-lock" ...) but then some trickery is
 ;; necessary to get them compiled.)
-;; Coment out 'when-compile part for debugging
+;; Comment out 'when-compile part for debugging
 (eval-when-compile
   (require 'cc-langs)
   (require 'cc-fonts)
@@ -76,6 +92,11 @@
   ;; This needs to be done also at compile time since the language
   ;; constants are evaluated then.
   (c-add-language 'd-mode 'java-mode))
+
+;; muffle the warnings about using free variables and undefined
+;; functions
+(defvar c-syntactic-element)
+(declare-function c-populate-syntax-table "cc-langs.el" (table))
 
 ;; D has pointers
 (c-lang-defconst c-type-decl-prefix-key
@@ -107,7 +128,7 @@
   d t)
 
 (c-lang-defconst c-opt-cpp-prefix
-  ;; Preprocssor directive recognizer.  D doesn't have cpp, but it has #line
+  ;; Preprocessor directive recognizer.  D doesn't have cpp, but it has #line
   d "\\s *#\\s *")
 
 (c-lang-defconst c-cpp-message-directives d nil)
@@ -136,24 +157,62 @@ operators."
 (c-lang-defconst c-literal-start-regexp
   ;; Regexp to match the start of comments and string literals.
   d "/[*+/]\\|\"\\|`")
-;;(c-lang-defconst c-comment-prefix-regexp d "//+\\|\\**")
-
-(c-lang-defconst c-doc-comment-start-regexp
- ;; doc comments for D use "///",  "/**" or doxygen's "/*!" "//!"
- d "/\\*[*!]\\|//[/!]")
 
 (c-lang-defconst c-block-prefix-disallowed-chars
   ;; Allow ':' for inherit list starters.
   d (set-difference (c-lang-const c-block-prefix-disallowed-chars)
-				 '(?:)))
+                    '(?:)))
+
+(defconst doxygen-font-lock-doc-comments
+  (let ((symbol "[a-zA-Z0-9_]+")
+	(header "^ \\* "))
+    `((,(concat header "\\("     symbol "\\):[ \t]*$")
+       1 ,c-doc-markup-face-name prepend nil)
+      (,(concat                  symbol     "()")
+       0 ,c-doc-markup-face-name prepend nil)
+      (,(concat header "\\(" "@" symbol "\\):")
+       1 ,c-doc-markup-face-name prepend nil)
+      (,(concat "[#%@]" symbol)
+       0 ,c-doc-markup-face-name prepend nil))
+    ))
+
+(defconst doxygen-font-lock-keywords
+  `((,(lambda (limit)
+	(c-font-lock-doc-comments "/\\+[+!]\\|/\\*[*!]\\|//[/!]" limit
+	  doxygen-font-lock-doc-comments)))))
+
+
+;;; Patterns to recognize the compiler generated messages
+
+;; The following regexp recognizes messages generated by the LDC and DMD
+;; compilers.  Subexpression 1 is the filename, 2 is the line number, nil is the
+;; column, because it's not present in the LDC error messages, and the
+;; subexpressions 3 and 4 are the message type -- error, warning, or info.
+
+;; GDC messages are recognized by gnu symbol already listed in
+;; compilation-error-regexp-alist.
+(add-to-list 'compilation-error-regexp-alist-alist
+             '(ldc
+               "^\\([^: \n]+\\)(\\([0-9]+\\)): \\(?: *\\(?3:\\(?:W\\(?::\\|arning\\)\\|warning\\)\\)\\| *\\(?4:[Ii]nfo\\(?:\\>\\|rmationa?l?\\)\\|I:\\|\\[ skipping \\.+ ]\\|instantiated from\\|required from\\|[Nn]ote\\)\\| *\\(?:[Ee]rror\\)\\| *Deprecation\\)"
+               1 2 nil (3 . 4)))
+(add-to-list 'compilation-error-regexp-alist 'ldc)
+
+;; The following regexp recognizes messages generated by the D runtime for
+;; unhandled exceptions (e.g. assert failures).
+
+(add-to-list 'compilation-error-regexp-alist-alist
+             '(d-exceptions
+               "^[^@]*?@\\(.*?\\)(\\([0-9]+\\)):"
+               1 2 nil 2))
+(add-to-list 'compilation-error-regexp-alist 'd-exceptions)
 
 ;;----------------------------------------------------------------------------
 
 ;; Built-in basic types
 (c-lang-defconst c-primitive-type-kwds
   d '("bit" "bool" "byte" "ubyte" "char" "delegate" "double" "float"
-      "function" "int" "long" "ubyte" "short" "uint" "ulong" "ushort"
-      "cent" "ucent" "real" "ireal" "ifloat" "creal" "cfloat" "cdouble"
+      "function" "int" "long" "short" "uint" "ulong" "ushort"
+      "cent" "ucent" "real" "ireal" "idouble" "ifloat" "creal" "cfloat" "cdouble"
       "wchar" "dchar" "void" "string" "wstring" "dstring"))
 
 ;; Keywords that can prefix normal declarations of identifiers
@@ -239,8 +298,7 @@ operators."
 (c-lang-defconst c-block-stmt-2-kwds
   ;; Statement keywords followed by a paren sexp and then by a substatement.
   d '("for" "if" "switch" "while" "catch" "synchronized" "scope"
-      "foreach" "foreach_reverse" "with" "unittest"
-      "else static if" "else"))
+      "foreach" "foreach_reverse" "with" "unittest"))
 
 (c-lang-defconst c-simple-stmt-kwds
   ;; Statement keywords followed by an expression or nothing.
@@ -261,7 +319,7 @@ operators."
 
 (c-lang-defconst c-before-label-kwds
   ;; Keywords that might be followed by a label identifier.
-  d    '("goto" "break" "continue"))
+  d '("goto" "break" "continue"))
 
 (c-lang-defconst c-constant-kwds
   ;; Keywords for constants.
@@ -273,11 +331,11 @@ operators."
 
 (c-lang-defconst c-inexpr-class-kwds
   ;; Keywords that can start classes inside expressions.
-  d    nil)
+  d nil)
 
 (c-lang-defconst c-inexpr-brace-list-kwds
   ;; Keywords that can start brace list blocks inside expressions.
-  d    nil)
+  d nil)
 
 (c-lang-defconst c-other-decl-kwds
   d '("module" "import"))
@@ -290,7 +348,8 @@ operators."
 
 (defcustom d-font-lock-extra-types nil
   "*List of extra types (aside from the type keywords) to recognize in D mode.
-   Each list item should be a regexp matching a single identifier.")
+   Each list item should be a regexp matching a single identifier."
+  :group 'd-mode)
 
 (defconst d-font-lock-keywords-1 (c-lang-const c-matchers-1 d)
   "Minimal highlighting for D mode.")
@@ -303,6 +362,13 @@ operators."
 
 (defvar d-font-lock-keywords d-font-lock-keywords-3
   "Default expressions to highlight in D mode.")
+
+(defun d-font-lock-keywords-2 ()
+  (c-compose-keywords-list d-font-lock-keywords-2))
+(defun d-font-lock-keywords-3 ()
+  (c-compose-keywords-list d-font-lock-keywords-3))
+(defun d-font-lock-keywords ()
+  (c-compose-keywords-list d-font-lock-keywords))
 
 (defvar d-mode-syntax-table nil
   "Syntax table used in d-mode buffers.")
@@ -378,7 +444,7 @@ operators."
    "\\([_a-zA-Z0-9]+\\)\\s-*"           ; function name
    "\\(?:([^)]*)\\s-*\\)?"              ; type arguments
    "([^)]*)\\s-*"                       ; arguments
-   "\\(?:[a-z]+\\s-*\\)?"               ; pure/const etc.
+   "\\(?:[a-z@]+\\s-*\\)?"              ; pure/const etc.
    "\\(?:;\\|[ \t\n]*\\(?:if\\|{\\)\\)")) ; ';' or 'if' or '{'
 
 (defun d-imenu-method-index-function ()
@@ -405,14 +471,46 @@ operators."
            (not invis))))))
 
 (defvar d-imenu-generic-expression
-  `(("*Classes*" "^\\s-*\\<class\\s-+\\([a-zA-Z0-9_]+\\)" 1)
-	("*Interfaces*" "^\\s-*\\<interface\\s-+\\([a-zA-Z0-9_]+\\)" 1)
-	("*Structs*" "^\\s-*\\<struct\\s-+\\([a-zA-Z0-9_]+\\)" 1)
-	("*Templates*" "^\\s-*\\(?:mixin\\s-+\\)?\\<template\\s-+\\([a-zA-Z0-9_]+\\)" 1)
+  `(("*Classes*" "^\\s-*\\(?:\\(?:final\\|abstract\\)\\s-+\\)?\\<class\\s-+\\([a-zA-Z0-9_]+\\)" 1)
+    ("*Interfaces*" "^\\s-*\\<interface\\s-+\\([a-zA-Z0-9_]+\\)" 1)
+    ("*Structs*" "^\\s-*\\<struct\\s-+\\([a-zA-Z0-9_]+\\)" 1)
+    ("*Templates*" "^\\s-*\\(?:mixin\\s-+\\)?\\<template\\s-+\\([a-zA-Z0-9_]+\\)" 1)
     (nil d-imenu-method-index-function 2)))
 
 ;;----------------------------------------------------------------------------
+;;; Workaround for special case of 'else static if' not being handled properly
+(defun d-special-case-looking-at (orig-fun &rest args)
+  (let ((rxp (car args)))
+    (if (and (stringp rxp) (string= rxp "if\\>[^_]"))
+        (or (apply orig-fun '("static\\>\\s-+if\\>[^_]"))
+            (apply orig-fun '("version\\>[^_]"))
+            (apply orig-fun '("debug\\>[^_]"))
+            (apply orig-fun args))
+      (apply orig-fun args))))
+
+(defun d-around--c-add-stmt-syntax (orig-fun &rest args)
+  (if (not (string= major-mode "d-mode"))
+      (apply orig-fun args)
+    (progn
+      (add-function :around (symbol-function 'looking-at)
+                    #'d-special-case-looking-at)
+      (unwind-protect
+          (apply orig-fun args)
+        (remove-function (symbol-function 'looking-at)
+                         #'d-special-case-looking-at)))))
+
+(when (version<= "24.4" emacs-version)
+  (advice-add 'c-add-stmt-syntax :around #'d-around--c-add-stmt-syntax))
+
+;;----------------------------------------------------------------------------
 ;;;###autoload (add-to-list 'auto-mode-alist '("\\.d[i]?\\'" . d-mode))
+
+;; Custom variables
+;;;###autoload
+(defcustom d-mode-hook nil
+  "*Hook called by `d-mode'."
+  :type 'hook
+  :group 'c)
 
 ;; For compatibility with Emacs < 24
 (defalias 'd-parent-mode
@@ -421,14 +519,15 @@ operators."
 ;;;###autoload
 (define-derived-mode d-mode d-parent-mode "D"
   "Major mode for editing code written in the D Programming Language.
-See http://www.digitalmars.com/d for more information about the D language.
+
+See http://dlang.org for more information about the D language.
+
 The hook `c-mode-common-hook' is run with no args at mode
 initialization, then `d-mode-hook'.
 
 Key bindings:
 \\{d-mode-map}"
   (c-initialize-cc-mode t)
-  (set-syntax-table d-mode-syntax-table)
   (setq local-abbrev-table d-mode-abbrev-table
         abbrev-mode t)
   (use-local-map d-mode-map)
@@ -437,16 +536,24 @@ Key bindings:
   (easy-menu-add d-menu)
   (c-run-mode-hooks 'c-mode-common-hook 'd-mode-hook)
   (c-update-modeline)
-  (setq imenu-generic-expression d-imenu-generic-expression))
+  (cc-imenu-init d-imenu-generic-expression)
+  ;; Generate a function that applies D-specific syntax properties.
+  ;; Concretely, inside back-quoted string literals the backslash
+  ;; character '\' is treated as a punctuation symbol.  See help for
+  ;; syntax-propertize-rules function for more information.
+  (when (version<= "24.3" emacs-version)
+    (setq-local syntax-propertize-function
+                (syntax-propertize-rules ("`[^\\\\`]*?\\(\\(\\\\\\)[^\\\\`]*?\\)+?`" (2 "."))))))
 
-;; Hideous hacks!
-;; 
-;; * auto/immutable: If we leve them in c-modifier-kwds (like
+;;----------------------------------------------------------------------------
+;; "Hideous hacks" to support appropriate font-lock behaviour.
+;;
+;; * auto/immutable: If we leave them in c-modifier-kwds (like
 ;;   c++-mode) then in the form "auto var;" var will be highlighted in
 ;;   type name face. Moving auto/immutable to font-lock-add-keywords
 ;;   lets cc-mode seeing them as a type name, so the next symbol can
 ;;   be fontified as a variable.
-;; 
+;;
 ;; * public/protected/private appear both in c-modifier-kwds and in
 ;;   c-protection-kwds. This causes cc-mode to fail parsing the first
 ;;   declaration after an access level label (because cc-mode trys to
@@ -483,7 +590,75 @@ Key bindings:
    (d-match-fun-decl (1 font-lock-type-face) (2 font-lock-function-name-face)))
  t)
 
-
+;;----------------------------------------------------------------------------
+;;
+;; Support for "Adjusting Alignment Rules for UCFS-Chains in D",
+;; cf. https://stackoverflow.com/questions/25797945/adjusting-alignment-rules-for-ucfs-chains-in-d
+;;
+;; The code here was originally created by Sergei Nosov
+;; (https://stackoverflow.com/users/1969069/sergei-nosov) based on the c-lineup-cascaded-calls code, see
+;; StackOverflow, and then amended by Nordlöw (https://stackoverflow.com/users/683710/nordl%C3%B6w) it
+;; provides a function that people can make use of in their d-mode-hook thus:
+;;
+;; (add-hook 'd-mode-hook
+;;                  '(lambda ()
+;;                     (add-to-list 'c-offsets-alist '(arglist-cont-nonempty . d-lineup-cascaded-calls))
+;;                     (add-to-list 'c-offsets-alist '(statement-cont . d-lineup-cascaded-calls))))
+
+(defun d-lineup-cascaded-calls (langelem)
+  "This is a modified `c-lineup-cascaded-calls' function for the
+D programming language which accounts for optional parenthesis
+and compile-time parameters in function calls."
+
+  (if (and (eq (c-langelem-sym langelem) 'arglist-cont-nonempty)
+           (not (eq (c-langelem-2nd-pos c-syntactic-element)
+                    (c-most-enclosing-brace (c-parse-state)))))
+      ;; The innermost open paren is not our one, so don't do
+      ;; anything. This can occur for arglist-cont-nonempty with
+      ;; nested arglist starts on the same line.
+      nil
+
+    (save-excursion
+      (back-to-indentation)
+      (let ((operator (and (looking-at "\\.")
+                           (regexp-quote (match-string 0))))
+            (stmt-start (c-langelem-pos langelem)) col)
+
+        (when (and operator
+                   (looking-at operator)
+                   (or (and
+                        (zerop (c-backward-token-2 1 t stmt-start))
+                        (eq (char-after) ?\()
+                        (zerop (c-backward-token-2 2 t stmt-start))
+                        (looking-at operator))
+                       (and
+                        (zerop (c-backward-token-2 1 t stmt-start))
+                        (looking-at operator))
+                       (and
+                        (zerop (c-backward-token-2 1 t stmt-start))
+                        (looking-at operator))
+                       )
+                   )
+          (setq col (current-column))
+
+          (while (or (and
+                      (zerop (c-backward-token-2 1 t stmt-start))
+                      (eq (char-after) ?\()
+                      (zerop (c-backward-token-2 2 t stmt-start))
+                      (looking-at operator))
+                     (and
+                      (zerop (c-backward-token-2 1 t stmt-start))
+                      (looking-at operator))
+                     (and
+                      (zerop (c-backward-token-2 1 t stmt-start))
+                      (looking-at operator))
+                     )
+            (setq col (current-column)))
+
+          (vector col))))))
+
+;;----------------------------------------------------------------------------
+
 (provide 'd-mode)
 
 ;;; d-mode.el ends here

@@ -88,3 +88,11 @@ export CATALINA_OPTS="-Dskylight.env.config.dir=$SKYLIGHT_HOME/conf -Dwgspring.i
 
 # Custom WGEN Ant Options
 export ANT_HOME="$HOME/wgen/ant.git/ant-1.8.1"
+
+# GTAGS
+export GTAGSCONF=/usr/local/share/gtags/gtags.conf
+export GTAGSLABEL=pygments
+
+export EDITOR='emacsclient'
+export GIT_EDITOR='emacsclient'
+export PAGER='cat'

@@ -97,3 +97,7 @@ fi
 if [ -f /etc/bash_completion ] && ! shopt -oq posix; then
     . /etc/bash_completion
 fi
+
+# Trying out local locate databases, see if these are helpful.
+alias loc='locate -d locate.db'
+alias upd='updatedb -l 0 -o locate.db -U .'
