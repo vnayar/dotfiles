@@ -44,6 +44,16 @@
 (setq-default indent-tabs-mode nil)
 (setq-default indicate-empty-lines t)
 
+;; Prevent C-z from Freezing GUI
+(defun my-suspend-frame ()
+  "In a GUI environment, do nothing; otherwise `suspend-frame'."
+  (interactive)
+  (if (display-graphic-p)
+      (message "suspend-frame disabled for graphical displays.")
+    (suspend-frame)))
+(global-unset-key (kbd "C-z"))
+(global-set-key (kbd "C-z C-z") 'my-suspend-frame)
+
 ;; Bury the current buffer.
 (global-set-key [f9] 'bury-buffer)
 
