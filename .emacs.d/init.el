@@ -5,8 +5,8 @@
 ;; Dive through ~/.emacs.d/elpa packages to add subdirs.
 (when (>= emacs-major-version 24)
   (require 'package)
-  (package-initialize)
   (add-to-list 'package-archives '("melpa" . "http://melpa.milkbox.net/packages/") t)
+  (package-initialize)
 
   (defun ensure-package-installed (&rest packages)
     "Assure every package is installed, ask for installation if it’s not.
@@ -27,21 +27,19 @@ Return a list of installed packages or nil for every skipped package."
       (package-refresh-contents))
 
   (ensure-package-installed
+   'auctex
    'bash-completion
    'd-mode
    'ggtags
    'markdown-mode
    'plantuml-mode
    'polymode
-   'top-mode)
+   'top-mode
+   'web-mode
+   'w3m)
   )
 
 ;; Theme Settings
-;(require 'color-theme)
-;(require 'color-theme-buffer-local)
-;(setq color-theme-is-global t)
-;(color-theme-initialize)
-;(color-theme-lethe)
 (add-to-list 'custom-theme-load-path "~/.emacs.d/themes/")
 (load-theme 'wheatgrass)
 
@@ -187,7 +185,7 @@ Return a list of installed packages or nil for every skipped package."
 (setenv "GIT_EDITOR" "emacs")
 
 ;; PlantUML Mode
-(setq plantuml-jar-path "/opt/plantuml/plantuml.jar")
+(setq plantuml-jar-path "~/bin/plantuml.jar")
 (require 'plantuml-mode)
 (defun my-plantuml-mode-hook ()
   (column-number-mode 1)
@@ -204,7 +202,6 @@ Return a list of installed packages or nil for every skipped package."
 
 ;; AUCTeX Settings
 (load "auctex.el" nil t t)
-(load "preview-latex.el" nil t t)
 (setq TeX-auto-save t)
 (setq TeX-parse-self t)
 (setq-default TeX-master nil)
