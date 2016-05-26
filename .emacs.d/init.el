@@ -55,13 +55,15 @@
 (global-set-key (kbd "C-z C-z") 'my-suspend-frame)
 
 ;; Bury the current buffer.
-(global-set-key [f9] 'bury-buffer)
+(global-set-key (kbd "<f9>") 'bury-buffer)
 
 (defun revert-buffer-no-confirm ()
   "Revert buffer without confirmation."
   (interactive) (revert-buffer t t)
   (message "Buffer %s reverted" (buffer-name)))
-(global-set-key [f11] 'revert-buffer-no-confirm)
+(global-set-key (kbd "<f11>") 'revert-buffer-no-confirm)
+
+(global-set-key (kbd "M-s h m") 'toggle-hl-line-when-idle)
 
 ;; Allow function keys to set dedicated windows for a buffer.
 ;; http://dfan.org/blog/2009/02/19/emacs-dedicated-windows/
@@ -73,7 +75,7 @@
    (message "Window %sdedicated to %s"
             (if dedicated "no longer " "")
             (buffer-name))))
-(global-set-key [f12] 'toggle-current-window-dedication)
+(global-set-key (kbd "<f12>") 'toggle-current-window-dedication)
 
 ;; Utility function to copy the buffer's file name.
 (defun copy-file-name ()
