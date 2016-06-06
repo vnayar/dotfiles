@@ -35,4 +35,4 @@ export ANT_HOME="$HOME/wgen/ant.git/ant-1.8.1"
 # GTAGS
 export GTAGSLABEL=pygments
 
-export EDITOR='emacsclient'
+export EDITOR='emacs'

@@ -43,26 +43,6 @@ Return a list of installed packages or nil for every skipped package."
 (add-to-list 'custom-theme-load-path "~/.emacs.d/themes/")
 (load-theme 'wheatgrass)
 
-;; GNU Global Tags Settings
-(require 'ggtags)
-(defun gtags-root-dir ()
-    "Returns GTAGS root directory or nil if doesn't exist."
-    (with-temp-buffer
-      (if (zerop (call-process "global" nil t nil "-pr"))
-          (buffer-substring (point-min) (1- (point-max)))
-        nil)))
-(defun gtags-update ()
-    "Make GTAGS incremental update"
-    (call-process "global" nil nil nil "-u"))
-(defun gtags-update-hook ()
-    (when (gtags-root-dir)
-      (gtags-update)))
-(add-hook 'c-mode-common-hook
-          (lambda ()
-            (when (derived-mode-p 'c-mode 'c++-mode 'java-mode)
-              (add-hook 'after-save-hook #'gtags-update-hook)
-              (ggtags-mode 1))))
-
 ;; General Editing Settings
 (setq inhibit-splash-screen t)
 (setq default-tab-width 4)
@@ -181,8 +161,8 @@ Return a list of installed packages or nil for every skipped package."
           'comint-truncate-buffer)
 
 ;; Git Settings
-(setenv "GIT_PAGER" "")
-(setenv "GIT_EDITOR" "emacs")
+(setenv "GIT_PAGER" "cat")
+(setenv "GIT_EDITOR" "emacsclient")
 
 ;; PlantUML Mode
 (setq plantuml-jar-path "~/bin/plantuml.jar")
@@ -197,7 +177,7 @@ Return a list of installed packages or nil for every skipped package."
 (defun plantuml-compile ()
   "Compile a PlantUML file into images."
   (interactive)
-  (compile (concat "java -jar /opt/plantuml/plantuml.jar " (buffer-file-name))))
+  (compile (concat plantuml-jar-path " " (buffer-file-name))))
 
 
 ;; AUCTeX Settings
@@ -391,5 +371,4 @@ Return a list of installed packages or nil for every skipped package."
  ;; If you edit it by hand, you could mess it up, so be careful.
  ;; Your init file should contain only one such instance.
  ;; If there is more than one, they won't work right.
- '(default ((t (:inherit nil :stipple nil :background "black" :foreground "wheat" :inverse-video nil :box nil :strike-through nil :overline nil :underline nil :slant normal :weight normal :height 86 :width normal :foundry "unknown" :family "DejaVu Sans Mono"))))
  '(web-mode-html-tag-face ((t (:foreground "steel blue")))))
