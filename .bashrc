@@ -99,7 +99,7 @@ if [ -f /etc/bash_completion ] && ! shopt -oq posix; then
 fi
 
 # Use my preferred ps output.
-alias ps='ps --cumulative -Ho ppid,pid,user,args,pcpu,size,vsize'
+alias ps='ps -U $USER -o pid,ppid,user,args,pcpu,size,vsize --sort=pcpu'
 
 # Trying out local locate databases, see if these are helpful.
 alias loc='locate -d locate.db'
