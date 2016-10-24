@@ -1,6 +1,9 @@
 [user]
 	name = Vijay Nayar
-	email = vnayar@wgen.net
+	email = madric@gmail.com
+[core]
+	pager = cat
+	editor = emacsclient -nc
 [color]
 	diff = auto
 	status = auto
