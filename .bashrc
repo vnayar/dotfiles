@@ -104,3 +104,6 @@ fi
 # Trying out local locate databases, see if these are helpful.
 alias loc='locate -d locate.db'
 alias upd='updatedb -l 0 -o locate.db -U .'
+
+# Useful so that even Emacs dumb terminal has color.
+export COLORTERM=1
