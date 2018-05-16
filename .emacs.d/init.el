@@ -1,5 +1,7 @@
 ;; Allow us to import custom modules.
 (add-to-list 'load-path "~/.emacs.d/lisp/")
+(add-to-list 'load-path "~/.emacs.d/org-9.0.5/lisp")
+(add-to-list 'load-path "~/.emacs.d/org-9.0.5/contrib/lisp")
 (add-to-list 'load-path "/usr/share/emacs/site-lisp/")
 
 ;; Dive through ~/.emacs.d/elpa packages to add subdirs.
@@ -27,21 +29,62 @@ Return a list of installed packages or nil for every skipped package."
       (package-refresh-contents))
 
   (ensure-package-installed
+   'ac-js2
+   'auto-complete
    'auctex
    'bash-completion
+   'column-marker
    'd-mode
    'ggtags
+   'google-c-style
+   'js2-mode
+   'leuven-theme
    'markdown-mode
+   'neotree
+   'org-ac
+   'ox-gfm
    'plantuml-mode
    'polymode
+   'projectile
    'top-mode
    'web-mode
    'w3m)
   )
 
+;; Various very small generic modes.
+(require 'generic-x)
+(add-to-list 'auto-mode-alist '("credentials\\'" . ini-generic-mode))
+
+;; Load a custom version of cedet, if available.
+; (when (file-exists-p "~/src/cedet/cedet-devel-load.el")
+;   (load "~/src/cedet/cedet-devel-load.el"))
+; (setq semantic-default-submodes
+;       '(;; Perform semantic actions during idle time
+;         global-semantic-idle-scheduler-mode
+;         ;; Use a database of parsed tags
+;         global-semanticdb-minor-mode
+;         ;; Decorate buffers with additional semantic information
+;         global-semantic-decoration-mode
+;         ;; Highlight the name of the function you're currently in
+;         global-semantic-highlight-func-mode
+;         ;; show the name of the function at the top in a sticky
+;         global-semantic-stickyfunc-mode
+;         ;; Generate a summary of the current tag when idle
+;         global-semantic-idle-summary-mode
+;         ;; Show a breadcrumb of location during idle time
+;         global-semantic-idle-breadcrumbs-mode
+;         ;; Switch to recently changed tags with `semantic-mrub-switch-tags',
+;         ;; or `C-x B'
+;         global-semantic-mru-bookmark-mode))
+; 
+; (add-hook 'emacs-lisp-mode-hook 'semantic-mode)
+; (add-hook 'python-mode-hook 'semantic-mode)
+; (add-hook 'java-mode-hook 'semantic-mode)
+; 
+; (require 'semantic/db-javap)
+ 
 ;; Theme Settings
 (add-to-list 'custom-theme-load-path "~/.emacs.d/themes/")
-(load-theme 'wheatgrass)
 
 ;; General Editing Settings
 (setq inhibit-splash-screen t)
@@ -61,6 +104,8 @@ Return a list of installed packages or nil for every skipped package."
 
 ;; Bury the current buffer.
 (global-set-key (kbd "<f9>") 'bury-buffer)
+
+(global-set-key (kbd "C-c L") 'org-store-link)
 
 (defun revert-buffer-no-confirm ()
   "Revert buffer without confirmation."
@@ -116,6 +161,17 @@ Return a list of installed packages or nil for every skipped package."
 (global-set-key (kbd "C-c k") 'windmove-up)
 (global-set-key (kbd "C-c l") 'windmove-right)
 
+;; auto-complete settings
+(require 'auto-complete)
+(define-key ac-completing-map [return] nil)
+(define-key ac-completing-map "\r" nil)
+(ac-config-default)
+
+;; Text Mode Settings
+(defun my-text-mode-hook ()
+  (setq-local show-trailing-whitespace t))
+(add-hook 'text-mode-hook 'my-text-mode-hook)
+
 ;; Shell Settings
 ; Make the prompt read-only, but let C-w still delete it.
 (set 'comint-prompt-read-only t)
@@ -124,6 +180,26 @@ Return a list of installed packages or nil for every skipped package."
             (define-key comint-mode-map "\C-w" 'comint-kill-region)
             (define-key comint-mode-map [C-S-backspace]
               'comint-kill-whole-line)))
+(defun my-shell-mode-hook ()
+  "Commands to run for shell-mode."
+  ;(auto-complete-mode)
+  ;(setq ac-delay 0.5)
+  ;(setq ac-sources
+  ;      '(ac-source-files-in-current-dir
+  ;        ac-source-filename))
+  )
+(add-hook 'shell-mode-hook 'my-shell-mode-hook)
+
+;; Mode settings for editing shell scripts.
+(defun my-sh-mode-hook ()
+  "Customizations for editing shell script files."
+  (setq-local fill-column 100)
+  (setq-local show-trailing-whitespace t)
+  (column-marker-1 100)
+  (setq tab-width 2)
+  )
+(add-hook 'sh-mode-hook 'my-sh-mode-hook)
+
 ; Enable colour.
 (add-hook 'comint-mode-hook 'ansi-color-for-comint-mode-on)
 ;(add-hook 'comint-mode-hook
@@ -145,6 +221,14 @@ Return a list of installed packages or nil for every skipped package."
 (require 'poly-R)
 (require 'poly-markdown)
 (add-to-list 'auto-mode-alist '("\\.Rmd\\'" . poly-markdown-mode))
+
+
+;; Parsing Expression Grammar files.
+(require 'peg-mode)
+(defun my-peg-mode-hook ()
+  (modify-syntax-entry ?[  "<"   peg-mode-syntax-table)
+  (modify-syntax-entry ?]  ">"   peg-mode-syntax-table))
+(add-to-list 'auto-mode-alist '("\\.peg\\'" . peg-mode))
 
 
 ;; Compilation Mode Settings
@@ -177,7 +261,7 @@ Return a list of installed packages or nil for every skipped package."
 (defun plantuml-compile ()
   "Compile a PlantUML file into images."
   (interactive)
-  (compile (concat plantuml-jar-path " " (buffer-file-name))))
+  (compile (concat "java -jar " plantuml-jar-path " " (buffer-file-name))))
 
 
 ;; AUCTeX Settings
@@ -189,9 +273,18 @@ Return a list of installed packages or nil for every skipped package."
 ;; Project Management
 (load "eproject")
 
+;; Project management, prefix key is "C-c p"
+(require 'projectile)
+(projectile-mode)
+(require 'neotree)
+(global-set-key [f8] 'neotree-toggle)
+
 ;; General Programming Settings
+(require 'google-c-style)
 (defun my-c-mode-common-hook ()
   ;(semantic-mode 1)
+  ;(google-set-c-style)
+  (google-make-newline-indent)
   (column-number-mode 1)
   (show-paren-mode 1)
   (setq-local fill-column 100)
@@ -207,19 +300,33 @@ Return a list of installed packages or nil for every skipped package."
       ;(local-set-key (kbd "M-*") 'pop-tag-mark)
       (local-set-key (kbd "M-*") 'ggtags-navigation-mode-abort)
       (ggtags-mode)))
-  (local-set-key (kbd "C-c C-r") 'gud-cont)
-  (local-set-key (kbd "<f5>") 'gud-cont)
-  (local-set-key (kbd "C-c C-s") 'gud-step)
-  (local-set-key (kbd "<f7>") 'gud-next)
-  (local-set-key (kbd "C-c C-n") 'gud-next)
-  (local-set-key (kbd "<f8>") 'gud-next)
-  (local-set-key (kbd "C-c C-u") 'gud-up)
-  (local-set-key (kbd "C-c C-d") 'gud-down)
-  (local-set-key (kbd "C-c C-b") 'gud-break))
+  ;(local-set-key (kbd "C-c C-r") 'gud-cont)
+  ;(local-set-key (kbd "<f5>") 'gud-cont)
+  ;(local-set-key (kbd "C-c C-s") 'gud-step)
+  ;(local-set-key (kbd "<f7>") 'gud-next)
+  ;(local-set-key (kbd "C-c C-n") 'gud-next)
+  ;(local-set-key (kbd "<f8>") 'gud-next)
+  ;(local-set-key (kbd "C-c C-u") 'gud-up)
+  ;(local-set-key (kbd "C-c C-d") 'gud-down)
+  ;(local-set-key (kbd "C-c C-b") 'gud-break)
+  )
 (add-hook 'c-mode-common-hook 'my-c-mode-common-hook)
 
+(require 'flycheck-rtags)
+(defun my-rtags-hook ()
+  "Set up rtags for use in C/C++/Objective-C."
+  (rtags-start-process-unless-running)
+  (rtags-diagnostics)
+  (rtags-enable-standard-keybindings)
+  (flycheck-select-checker 'rtags)
+  (setq-local flycheck-highlighting-mode nil)  ;; RTags creates more accurate overlays.
+  (setq-local flycheck-check-syntax-automatically nil))
+(add-hook 'c-mode-hook 'my-rtags-hook)
+(add-hook 'c++-mode-hook 'my-rtags-hook)
+(add-hook 'objc-mode-hook 'my-rtags-hook)
 
 ;; Java Debugging JSwat Settings
+(require 'yasnippet)
 (remove-hook 'jdb-mode-hook 'google-jdb-fix-comint-prompt)
 (defun jswat ()
   (interactive)
@@ -227,16 +334,29 @@ Return a list of installed packages or nil for every skipped package."
   (google-jswat))
 
 ;; Java Programming Language Settings
+;(require 'semantic/db-javap)
 ;(require 'jdee)
+;(require 'jdee-flycheck)
 ;(require 'google-java-format)
 ;(require 'malabar-mode)
 ;(add-to-list 'auto-mode-alist '("\\.java\\'" . malabar-mode))
 (defun my-java-mode-hook ()
+  (google-set-c-style)
+  (google-make-newline-indent)
   (setq c-comment-start-regexp "\\(@\\|/\\(/\\|[*][*]?\\)\\)")
   (modify-syntax-entry ?@ "< b" java-mode-syntax-table)
-  (setq-local c-basic-offset 2)
+  (c-set-offset 'func-decl-cont 'nil)
+  (c-set-offset 'arglist-intro '++)
+  (c-set-offset 'arglist-cont 'nil)
+  (c-set-offset 'arglist-cont-nonempty '++)
   (setq-local fill-column 100)
   (column-marker-1 100)
+  (auto-complete-mode)
+  (setq ac-sources
+        '(ac-source-gtags
+          ac-source-words-in-same-mode-buffers
+          ac-source-abbrev
+          ac-source-dictionary))
   ;(local-set-key (kbd "C-c i") 'google-imports-add-import-from-tag)
   ;(local-set-key (kbd "C-c i") 'google-imports-jade)
   ;(local-set-key (kbd "C-c f") #'google-java-format-region)
@@ -245,8 +365,9 @@ Return a list of installed packages or nil for every skipped package."
   )
 (add-hook 'java-mode-hook 'my-java-mode-hook)
 
-
 ;; JavaScript Programming Language Settings
+(require 'ac-js2)
+(require 'js2-mode)
 (add-to-list 'auto-mode-alist '("\\.js\\'" . js2-mode))
 (defun my-js2-mode-hook ()
   (if (string-match "/google3\\(/\\|$\\)" (pwd))
@@ -259,6 +380,7 @@ Return a list of installed packages or nil for every skipped package."
       ;(gtags-update-after-save-hook)
       (local-set-key (kbd "M-*") 'pop-tag-mark)
       (ggtags-mode)))
+  (ac-js2-mode)
   (setq-local fill-column 80))
 (add-hook 'js2-mode-hook 'my-js2-mode-hook)
 
@@ -276,8 +398,24 @@ Return a list of installed packages or nil for every skipped package."
 
 
 ;; D Programming Language Settings
+(require 'ac-dcd)
 (autoload 'd-mode "d-mode" "Major mode for editing D code." t)
 (add-to-list 'auto-mode-alist '("\\.d[i]?\\'" . d-mode))
+(add-hook 'd-mode-hook 'ac-dcd-setup)
+(defun my-d-mode-hook ()
+  "My settings for d-mode."
+  (setq-local show-trailing-whitespace t)
+  (setq-local fill-column 100)
+  (column-marker-1 100)
+  (c-set-offset 'func-decl-cont 'nil)
+  (c-set-offset 'arglist-intro '++)
+  (c-set-offset 'arglist-cont 'nil)
+  (c-set-offset 'arglist-cont-nonempty '++)
+  (c-set-offset 'case-label '+)
+  (c-set-offset 'statement-cont '++)
+  )
+(add-hook 'd-mode-hook 'my-d-mode-hook)
+
 
 
 ;; Web Mode - http://web-mode.org/
@@ -334,7 +472,20 @@ Return a list of installed packages or nil for every skipped package."
 ;(require 'opengrok)
 
 ;; Org-mode settings
+(defun my-org-mode-hook ()
+  "My settings for org-mode."
+  (setq-local fill-column 100)
+  (setq-local show-trailing-whitespace t))
+(add-hook 'org-mode-hook 'my-org-mode-hook)
 (setq org-src-fontify-natively t)
+(setq org-confirm-babel-evaluate nil)
+; Export to Github Flavored Markdown.
+(require 'ox-gfm)
+; Set up org autocomplete sources.
+(require 'org-ac)
+(org-ac/config-default)
+; PlantUML Support in org-mode.
+(require 'ob-plantuml)
 
 
 ;; Personal preferences and customizations.
@@ -345,30 +496,63 @@ Return a list of installed packages or nil for every skipped package."
  ;; If you edit it by hand, you could mess it up, so be careful.
  ;; Your init file should contain only one such instance.
  ;; If there is more than one, they won't work right.
- '(ansi-color-names-vector ["dim gray" "red" "green" "yellow" "steel blue" "magenta" "cyan" "white"])
- '(blink-cursor-mode t)
+ '(ac-delay 0.2)
+ '(ac-non-trigger-commands
+   (quote
+    (*table--cell-self-insert-command electric-buffer-list org-cycle)))
+ '(ac-use-fuzzy t)
+ '(ansi-color-faces-vector
+   [default default default italic underline success warning error])
+ '(ansi-color-names-vector
+   ["dim gray" "red" "green" "yellow" "steel blue" "magenta" "cyan" "white"])
  '(bookmark-save-flag 1)
+ '(calendar-week-start-day 1)
  '(column-number-mode t)
- '(custom-safe-themes (quote ("1e7e097ec8cb1f8c3a912d7e1e0331caeed49fef6cff220be63bd2a6ba4cc365" "fc5fcb6f1f1c1bc01305694c59a1a861b008c534cae8d0e48e4d5e81ad718bc6" "aecea99f23d116cd33dabe34b9df808816c374328c064fcf12d15cecc3735237" default)))
+ '(custom-enabled-themes (quote (leuven)))
+ '(custom-safe-themes
+   (quote
+    ("2e1e2657303116350fe764484e8300ca2e4cf45a73cdbd879bc0ca29cb337147" "43c1a8090ed19ab3c0b1490ce412f78f157d69a29828aa977dae941b994b4147" "ad9747dc51ca23d1c1382fa9bd5d76e958a5bfe179784989a6a666fe801aadf2" "b04d091b3315afedc67e4e2e9950c272789804cf0cb7e93750d70475a47b935b" "1e7e097ec8cb1f8c3a912d7e1e0331caeed49fef6cff220be63bd2a6ba4cc365" "fc5fcb6f1f1c1bc01305694c59a1a861b008c534cae8d0e48e4d5e81ad718bc6" "aecea99f23d116cd33dabe34b9df808816c374328c064fcf12d15cecc3735237" default)))
  '(delete-trailing-lines nil)
  '(ecb-options-version "2.40")
  '(even-window-heights t)
  '(fill-column 100)
  '(gcomplete-jump-to-def-binding [ignore])
- '(jdee-server-dir "~/.emacs.d/jdee-server/")
+ '(generic-extras-enable-list
+   (quote
+    (alias-generic-mode apache-conf-generic-mode apache-log-generic-mode etc-fstab-generic-mode etc-modules-conf-generic-mode etc-passwd-generic-mode etc-services-generic-mode etc-sudoers-generic-mode fvwm-generic-mode hosts-generic-mode inetd-conf-generic-mode ini-generic-mode java-manifest-generic-mode java-properties-generic-mode javascript-generic-mode mailagent-rules-generic-mode mailrc-generic-mode named-boot-generic-mode named-database-generic-mode prototype-generic-mode resolve-conf-generic-mode samba-generic-mode show-tabs-generic-mode vrml-generic-mode x-resource-generic-mode xmodmap-generic-mode)))
+ '(grep-command "grep --color -nHE -e ")
+ '(grep-find-command
+   (quote
+    ("find . -type f -exec grep --color -nHE -e  {} +" . 43)))
+ '(grep-find-ignored-files
+   (quote
+    (".#*" "*.o" "*~" "*.bin" "*.lbin" "*.so" "*.a" "*.ln" "*.blg" "*.bbl" "*.elc" "*.lof" "*.glo" "*.idx" "*.lot" "*.fmt" "*.tfm" "*.class" "*.fas" "*.lib" "*.mem" "*.x86f" "*.sparcf" "*.dfsl" "*.pfsl" "*.d64fsl" "*.p64fsl" "*.lx64fsl" "*.lx32fsl" "*.dx64fsl" "*.dx32fsl" "*.fx64fsl" "*.fx32fsl" "*.sx64fsl" "*.sx32fsl" "*.wx64fsl" "*.wx32fsl" "*.fasl" "*.ufsl" "*.fsl" "*.dxl" "*.lo" "*.la" "*.gmo" "*.mo" "*.toc" "*.aux" "*.cp" "*.fn" "*.ky" "*.pg" "*.tp" "*.vr" "*.cps" "*.fns" "*.kys" "*.pgs" "*.tps" "*.vrs" "*.pyc" "*.pyo" "#*#" "GPATH" "GRTAGS" "GSYMS" "GTAGS" "*.jar" "*.iml")))
+ '(grep-find-template
+   "find . <X> -type f <F> -exec grep <C> --color -nHE -e <R> {} +")
+ '(hl-sexp-background-color "#efebe9")
+ '(jdee-server-dir "~/bin")
+ '(js-indent-level 2)
  '(js2-basic-offset 2)
  '(js2-bounce-indent-p t)
+ '(js2-global-externs nil)
+ '(js2-include-node-externs t)
  '(js2-init-hook (quote (my-c-mode-common-hook)))
+ '(org-ac/ac-trigger-command-keys (quote ("\\" "SPC" ":" "[" "+")))
+ '(org-babel-load-languages (quote ((emacs-lisp . t) (plantuml . t))))
+ '(org-link-file-path-type (quote relative))
+ '(org-plantuml-jar-path "/home/vnayar/bin/plantuml.jar")
  '(org-todo-keywords (quote ((sequence "TODO" "WAIT" "DONE"))))
+ '(peg-mode-hook (quote (my-peg-mode-hook)))
+ '(rtags-install-path nil)
+ '(rtags-path "~/src/rtags/bin")
+ '(rtags-reindex-on-save t)
  '(scroll-bar-mode nil)
  '(show-paren-mode t)
- ;'(w3m-enable-google-feeling-lucky nil)
- ;'(w3m-home-page "about:blank")
- ;'(w3m-session-crash-recovery nil)
  '(tool-bar-mode nil))
 (custom-set-faces
  ;; custom-set-faces was added by Custom.
  ;; If you edit it by hand, you could mess it up, so be careful.
  ;; Your init file should contain only one such instance.
  ;; If there is more than one, they won't work right.
+ '(default ((t (:family "WenQuanYi Micro Hei Mono" :foundry "WQYF" :slant normal :weight normal :height 98 :width normal))))
  '(web-mode-html-tag-face ((t (:foreground "steel blue")))))

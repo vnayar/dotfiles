@@ -98,12 +98,34 @@ if [ -f /etc/bash_completion ] && ! shopt -oq posix; then
     . /etc/bash_completion
 fi
 
+# A helpful function for encrypting a file.
+function enc() {
+    openssl enc -e -aes-256-cbc -in "$1" -out "$1.enc"
+}
+
+# A helpful function for decrypting a file.
+function dec() {
+    # Remove everything up to the last '.', to validate the file ending.
+    if [[ ${1##*.} != "enc" ]] ; then
+        echo "Error: Expected file ending in '.enc'."
+        return 1
+    fi
+    # Decrypt and write output to a file with the final '.enc' removed.
+    openssl enc -d -aes-256-cbc -in "$1" -out "${1%.*}"
+}
+
 # Use my preferred ps output.
 #alias ps='ps -U $USER -o pid,ppid,user,args,pcpu,size,vsize --sort=pcpu'
+alias pps='ps -el | head -n1 ; ps -el | tail -n+2 | sort -nrk6 | head -n5'
 
 # Trying out local locate databases, see if these are helpful.
 alias loc='locate -d locate.db'
-alias upd='updatedb -l 0 -o locate.db -U .'
+alias upd='updatedb -l 0 -o locate.db -n target -n bin -U .'
+
+alias dictde='dict -d fd-deu-eng'
+alias dicted='dict -d fd-eng-deu'
 
 # Useful so that even Emacs dumb terminal has color.
 export COLORTERM=1
+
+export PATH=$HOME/.local/bin:$PATH
