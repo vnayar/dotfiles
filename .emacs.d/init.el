@@ -43,6 +43,7 @@ Return a list of installed packages or nil for every skipped package."
    'ggtags
    'google-c-style
    'groovy-mode
+   'image+
    'js2-mode
    'leuven-theme
    'markdown-mode
