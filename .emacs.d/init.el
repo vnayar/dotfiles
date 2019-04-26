@@ -29,24 +29,33 @@ Return a list of installed packages or nil for every skipped package."
       (package-refresh-contents))
 
   (ensure-package-installed
+   'ac-dcd
    'ac-js2
    'auto-complete
    'auctex
    'bash-completion
-   'column-marker
+   'bm
+   'company
+   'company-dcd
+   'fill-column-indicator
    'd-mode
+   'flycheck-rtags
    'ggtags
    'google-c-style
+   'groovy-mode
    'js2-mode
    'leuven-theme
    'markdown-mode
    'neotree
    'org-ac
    'ox-gfm
+   'pcmpl-args
+   'pcmpl-git
    'plantuml-mode
    'polymode
    'projectile
-   'top-mode
+   'protobuf-mode
+   'terraform-mode
    'web-mode
    'w3m)
   )
@@ -91,6 +100,10 @@ Return a list of installed packages or nil for every skipped package."
 (setq default-tab-width 4)
 (setq-default indent-tabs-mode nil)
 (setq-default indicate-empty-lines t)
+
+;; Visual Bookmark Settings
+(require 'bm)
+(global-set-key (kbd "C-c b") 'bm-toggle)
 
 ;; Prevent C-z from Freezing GUI
 (defun my-suspend-frame ()
@@ -155,6 +168,8 @@ Return a list of installed packages or nil for every skipped package."
     (select-window window_tl)))
 (global-set-key (kbd "C-c w") 'init-windows)
 
+(require 'fill-column-indicator)
+
 ;; Keybindings for navigating windows.
 (global-set-key (kbd "C-c h") 'windmove-left)
 (global-set-key (kbd "C-c j") 'windmove-down)
@@ -209,6 +224,9 @@ Return a list of installed packages or nil for every skipped package."
 ;; BUCK Support
 (add-to-list 'auto-mode-alist '("BUCK\\'" . python-mode))
 
+;; Jenkins files are in Groovy.
+(add-to-list 'auto-mode-alist '("Jenkinsfile\\'" . groovy-mode))
+
 ;; Markdown Mode Support
 (autoload 'markdown-mode "markdown-mode"
   "Major mode for editing Markdown files" t)
@@ -218,9 +236,9 @@ Return a list of installed packages or nil for every skipped package."
 
 
 ;; Polymode Support
-(require 'poly-R)
-(require 'poly-markdown)
-(add-to-list 'auto-mode-alist '("\\.Rmd\\'" . poly-markdown-mode))
+;(require 'poly-R)
+;(require 'poly-markdown)
+;(add-to-list 'auto-mode-alist '("\\.Rmd\\'" . poly-markdown-mode))
 
 
 ;; Parsing Expression Grammar files.
@@ -248,6 +266,10 @@ Return a list of installed packages or nil for every skipped package."
 (setenv "GIT_PAGER" "cat")
 (setenv "GIT_EDITOR" "emacsclient")
 
+;; Image Manipulation
+(eval-after-load 'image '(require 'image+))
+(eval-after-load 'image+ '(imagex-global-sticky-mode 1))
+
 ;; PlantUML Mode
 (setq plantuml-jar-path "~/bin/plantuml.jar")
 (require 'plantuml-mode)
@@ -255,6 +277,7 @@ Return a list of installed packages or nil for every skipped package."
   (column-number-mode 1)
   (show-paren-mode 1)
   (setq-local fill-column 100)
+  (fci-mode)
   (setq-local show-trailing-whitespace t)
   (setq plantuml-indent-offset 2))
 (add-hook 'plantuml-mode-hook 'my-plantuml-mode-hook)
@@ -270,12 +293,10 @@ Return a list of installed packages or nil for every skipped package."
 (setq TeX-parse-self t)
 (setq-default TeX-master nil)
 
-;; Project Management
-(load "eproject")
-
 ;; Project management, prefix key is "C-c p"
 (require 'projectile)
 (projectile-mode)
+(define-key projectile-mode-map (kbd "C-c p") 'projectile-command-map)
 (require 'neotree)
 (global-set-key [f8] 'neotree-toggle)
 
@@ -326,7 +347,7 @@ Return a list of installed packages or nil for every skipped package."
 (add-hook 'objc-mode-hook 'my-rtags-hook)
 
 ;; Java Debugging JSwat Settings
-(require 'yasnippet)
+;(require 'yasnippet)
 (remove-hook 'jdb-mode-hook 'google-jdb-fix-comint-prompt)
 (defun jswat ()
   (interactive)
@@ -350,7 +371,7 @@ Return a list of installed packages or nil for every skipped package."
   (c-set-offset 'arglist-cont 'nil)
   (c-set-offset 'arglist-cont-nonempty '++)
   (setq-local fill-column 100)
-  (column-marker-1 100)
+  (fci-mode)
   (auto-complete-mode)
   (setq ac-sources
         '(ac-source-gtags
@@ -406,16 +427,16 @@ Return a list of installed packages or nil for every skipped package."
   "My settings for d-mode."
   (setq-local show-trailing-whitespace t)
   (setq-local fill-column 100)
-  (column-marker-1 100)
+  (fci-mode)
   (c-set-offset 'func-decl-cont 'nil)
   (c-set-offset 'arglist-intro '++)
   (c-set-offset 'arglist-cont 'nil)
   (c-set-offset 'arglist-cont-nonempty '++)
   (c-set-offset 'case-label '+)
   (c-set-offset 'statement-cont '++)
+  (company-dcd-mode)
   )
 (add-hook 'd-mode-hook 'my-d-mode-hook)
-
 
 
 ;; Web Mode - http://web-mode.org/
@@ -475,6 +496,7 @@ Return a list of installed packages or nil for every skipped package."
 (defun my-org-mode-hook ()
   "My settings for org-mode."
   (setq-local fill-column 100)
+  (fci-mode)
   (setq-local show-trailing-whitespace t))
 (add-hook 'org-mode-hook 'my-org-mode-hook)
 (setq org-src-fontify-natively t)
@@ -538,7 +560,14 @@ Return a list of installed packages or nil for every skipped package."
  '(js2-include-node-externs t)
  '(js2-init-hook (quote (my-c-mode-common-hook)))
  '(org-ac/ac-trigger-command-keys (quote ("\\" "SPC" ":" "[" "+")))
- '(org-babel-load-languages (quote ((emacs-lisp . t) (plantuml . t))))
+ '(org-babel-load-languages
+   (quote
+    ((emacs-lisp . t)
+     (plantuml . t)
+     (gnuplot . t)
+     (shell . t)
+     (R . t))))
+ '(org-export-with-toc 4)
  '(org-link-file-path-type (quote relative))
  '(org-plantuml-jar-path "/home/vnayar/bin/plantuml.jar")
  '(org-todo-keywords (quote ((sequence "TODO" "WAIT" "DONE"))))
