@@ -1,4 +1,6 @@
 ;; Allow us to import custom modules.
+; Workaround for a bug in Emacs 26.1
+(setq gnutls-algorithm-priority "NORMAL:-VERS-TLS1.3")
 (add-to-list 'load-path "~/.emacs.d/lisp/")
 (add-to-list 'load-path "~/.emacs.d/org-9.0.5/lisp")
 (add-to-list 'load-path "~/.emacs.d/org-9.0.5/contrib/lisp")
@@ -7,104 +9,132 @@
 ;; Dive through ~/.emacs.d/elpa packages to add subdirs.
 (when (>= emacs-major-version 24)
   (require 'package)
+  (add-to-list 'package-archives '("org" . "http://orgmode.org/elpa/") t)
+  (add-to-list 'package-archives '("melpa" . "https://melpa.org/packages/") t)
+  (package-initialize))
 
-  (add-to-list 'package-archives '("melpa" . "http://melpa.milkbox.net/packages/") t)
-  (package-initialize)
+(condition-case nil
+    (require 'use-package)
+  (file-error
+   (require 'package)
+   (add-to-list 'package-archives '("melpa" . "https://melpa.org/packages/") t)
+   (package-initialize)
+   (package-refresh-contents)
+   (package-install 'use-package)
+   (require 'use-package)))
 
-  (defun ensure-package-installed (&rest packages)
-    "Assure every package is installed, ask for installation if it’s not.
-Return a list of installed packages or nil for every skipped package."
-    (mapcar
-     (lambda (package)
-       (if (package-installed-p package)
-       nil
-     (if (y-or-n-p (format "Package %s is missing. Install it? " package))
-         (package-install package)
-       package)))
-     packages))
+(message "Checkpoint 1")
+; Sets the :ensure t property for all use-package calls.
+(setq use-package-always-ensure t)
 
-  ;; make sure to have downloaded archive description.
-  ;; Or use package-archive-contents as suggested by Nicolas Dudebout
-  (or (file-exists-p package-user-dir)
-      (package-refresh-contents))
+;; Debugging Emacs startup time.
+;(use-package esup
+;  :ensure t
+;  ;; To use MELPA Stable use ":pin melpa-stable",
+;  :pin melpa)
 
-  (ensure-package-installed
-   'ac-dcd
-   'ac-js2
-   'auto-complete
-   'auctex
-   'bash-completion
-   'bm
-   'company
-   'company-dcd
-   'fill-column-indicator
-   'd-mode
-   'flycheck-rtags
-   'ggtags
-   'google-c-style
-   'groovy-mode
-   'image+
-   'js2-mode
-   'leuven-theme
-   'markdown-mode
-   'neotree
-   'org-ac
-   'ox-gfm
-   'pcmpl-args
-   'pcmpl-git
-   'plantuml-mode
-   'polymode
-   'projectile
-   'protobuf-mode
-   'terraform-mode
-   'web-mode
-   'w3m)
-  )
+;; JavaScript Programming Language Settings
+;(use-package ac-js2 :defer t)
+;(use-package js2-mode
+;  :mode "\\.js\\'"
+;  :after (ac-js2)
+;  :bind (("M-*" . pop-tag-mark))
+;  :config
+;  (defun my-js2-mode-hook ()
+;    (ggtags-mode)
+;    (ac-js2-mode)
+;    (setq-local fill-column 100))
+;  (add-hook 'js2-mode-hook 'my-js2-mode-hook))
+
+(use-package auto-complete)
+(use-package tex :ensure auctex)
+(use-package bash-completion)
+(use-package column-marker)
+(use-package company)
+
+;; D Programming Language Settings
+(use-package company-dcd)
+(use-package d-mode
+  :mode "\\.d[i]?\\'"
+  :config
+  (defun my-d-mode-hook ()
+    "My settings for d-mode."
+    (setq-local show-trailing-whitespace t)
+    (setq-local fill-column 100)
+    (column-marker-1 100)
+    (c-set-offset 'func-decl-cont 'nil)
+    (c-set-offset 'arglist-intro '++)
+    (c-set-offset 'arglist-cont 'nil)
+    (c-set-offset 'arglist-cont-nonempty '++)
+    (c-set-offset 'case-label '+)
+    (c-set-offset 'statement-cont '++)
+    (company-dcd-mode))
+  (add-hook 'd-mode-hook 'my-d-mode-hook))
+
+(message "Checkpoint 2")
+(use-package ess :mode "\\.R\\'")
+(use-package ggtags)
+(use-package google-c-style)
+(use-package leuven-theme)
+(use-package markdown-mode :mode "\\.md\\'")
+(use-package neotree)
+(require 'ob-plantuml)
+
+(message "Checkpoint 3")
+;; PlantUML Mode
+(use-package plantuml-mode
+  :mode "\\.puml\\'"
+  :init
+  (setq plantuml-jar-path "~/bin/plantuml.jar")
+  (setq plantuml-default-exec-mode 'jar)
+  :config
+  (defun my-plantuml-mode-hook ()
+    (column-number-mode 1)
+    (show-paren-mode 1)
+    (setq-local fill-column 100)
+    (setq-local show-trailing-whitespace t)
+    (setq plantuml-indent-offset 2))
+  (defun plantuml-compile ()
+    "Compile a PlantUML file into images."
+    (interactive)
+    (compile (concat "java -jar " plantuml-jar-path " " (buffer-file-name))))
+  (add-hook 'plantuml-mode-hook 'my-plantuml-mode-hook))
+
+(message "Checkpoint 4")
+(use-package polymode :mode "\\.R\\'")
+(use-package projectile)
+;(use-package top-mode)
+;(use-package web-mode
+;  :mode "\\.\\(js\\|html?\\)\\'"
+;  :init
+;  (setq create-lockfiles nil)
+;  (setq web-mode-style-padding 2)
+;  (setq web-mode-script-padding 2)
+;  (setq web-mode-markup-indent-offset 2)
+;  (setq web-mode-css-indent-offset 2)
+;  (setq web-mode-code-indent-offset 2))
+(use-package rjsx-mode
+  :mode "\\.js\\'"
+  :init
+  (setq create-lockfiles nil))
+
+;(use-package w3m)
+
+(desktop-save-mode 't)
 
 ;; Various very small generic modes.
 (require 'generic-x)
 (add-to-list 'auto-mode-alist '("credentials\\'" . ini-generic-mode))
 
-;; Load a custom version of cedet, if available.
-; (when (file-exists-p "~/src/cedet/cedet-devel-load.el")
-;   (load "~/src/cedet/cedet-devel-load.el"))
-; (setq semantic-default-submodes
-;       '(;; Perform semantic actions during idle time
-;         global-semantic-idle-scheduler-mode
-;         ;; Use a database of parsed tags
-;         global-semanticdb-minor-mode
-;         ;; Decorate buffers with additional semantic information
-;         global-semantic-decoration-mode
-;         ;; Highlight the name of the function you're currently in
-;         global-semantic-highlight-func-mode
-;         ;; show the name of the function at the top in a sticky
-;         global-semantic-stickyfunc-mode
-;         ;; Generate a summary of the current tag when idle
-;         global-semantic-idle-summary-mode
-;         ;; Show a breadcrumb of location during idle time
-;         global-semantic-idle-breadcrumbs-mode
-;         ;; Switch to recently changed tags with `semantic-mrub-switch-tags',
-;         ;; or `C-x B'
-;         global-semantic-mru-bookmark-mode))
-; 
-; (add-hook 'emacs-lisp-mode-hook 'semantic-mode)
-; (add-hook 'python-mode-hook 'semantic-mode)
-; (add-hook 'java-mode-hook 'semantic-mode)
-; 
-; (require 'semantic/db-javap)
- 
 ;; Theme Settings
 (add-to-list 'custom-theme-load-path "~/.emacs.d/themes/")
 
 ;; General Editing Settings
+(message "Checkpoint 5")
 (setq inhibit-splash-screen t)
 (setq default-tab-width 4)
 (setq-default indent-tabs-mode nil)
 (setq-default indicate-empty-lines t)
-
-;; Visual Bookmark Settings
-(require 'bm)
-(global-set-key (kbd "C-c b") 'bm-toggle)
 
 ;; Prevent C-z from Freezing GUI
 (defun my-suspend-frame ()
@@ -169,19 +199,18 @@ Return a list of installed packages or nil for every skipped package."
     (select-window window_tl)))
 (global-set-key (kbd "C-c w") 'init-windows)
 
-(require 'fill-column-indicator)
-
 ;; Keybindings for navigating windows.
 (global-set-key (kbd "C-c h") 'windmove-left)
 (global-set-key (kbd "C-c j") 'windmove-down)
 (global-set-key (kbd "C-c k") 'windmove-up)
 (global-set-key (kbd "C-c l") 'windmove-right)
 
+(message "Checkpoint 6")
 ;; auto-complete settings
 (require 'auto-complete)
 (define-key ac-completing-map [return] nil)
 (define-key ac-completing-map "\r" nil)
-(ac-config-default)
+;(ac-config-default)
 
 ;; Text Mode Settings
 (defun my-text-mode-hook ()
@@ -206,6 +235,7 @@ Return a list of installed packages or nil for every skipped package."
   )
 (add-hook 'shell-mode-hook 'my-shell-mode-hook)
 
+(message "Checkpoint 7")
 ;; Mode settings for editing shell scripts.
 (defun my-sh-mode-hook ()
   "Customizations for editing shell script files."
@@ -225,9 +255,6 @@ Return a list of installed packages or nil for every skipped package."
 ;; BUCK Support
 (add-to-list 'auto-mode-alist '("BUCK\\'" . python-mode))
 
-;; Jenkins files are in Groovy.
-(add-to-list 'auto-mode-alist '("Jenkinsfile\\'" . groovy-mode))
-
 ;; Markdown Mode Support
 (autoload 'markdown-mode "markdown-mode"
   "Major mode for editing Markdown files" t)
@@ -242,14 +269,15 @@ Return a list of installed packages or nil for every skipped package."
 ;(add-to-list 'auto-mode-alist '("\\.Rmd\\'" . poly-markdown-mode))
 
 
+(message "Checkpoint 8")
 ;; Parsing Expression Grammar files.
 (require 'peg-mode)
 (defun my-peg-mode-hook ()
-  (modify-syntax-entry ?[  "<"   peg-mode-syntax-table)
-  (modify-syntax-entry ?]  ">"   peg-mode-syntax-table))
+  (modify-syntax-entry ?\[  "<"   peg-mode-syntax-table)
+  (modify-syntax-entry ?\]  ">"   peg-mode-syntax-table))
 (add-to-list 'auto-mode-alist '("\\.peg\\'" . peg-mode))
 
-
+(message "Checkpoint 9")
 ;; Compilation Mode Settings
 (add-to-list 'auto-mode-alist '("/test\\.log\\'" . compilation-minor-mode))
 ;(add-hook 'compilation-mode-hook
@@ -267,39 +295,22 @@ Return a list of installed packages or nil for every skipped package."
 (setenv "GIT_PAGER" "cat")
 (setenv "GIT_EDITOR" "emacsclient")
 
-;; Image Manipulation
-(eval-after-load 'image '(require 'image+))
-(eval-after-load 'image+ '(imagex-global-sticky-mode 1))
-
-;; PlantUML Mode
-(setq plantuml-jar-path "~/bin/plantuml.jar")
-(require 'plantuml-mode)
-(defun my-plantuml-mode-hook ()
-  (column-number-mode 1)
-  (show-paren-mode 1)
-  (setq-local fill-column 100)
-  (fci-mode)
-  (setq-local show-trailing-whitespace t)
-  (setq plantuml-indent-offset 2))
-(add-hook 'plantuml-mode-hook 'my-plantuml-mode-hook)
-(defun plantuml-compile ()
-  "Compile a PlantUML file into images."
-  (interactive)
-  (compile (concat "java -jar " plantuml-jar-path " " (buffer-file-name))))
-
-
 ;; AUCTeX Settings
-(load "auctex.el" nil t t)
-(setq TeX-auto-save t)
-(setq TeX-parse-self t)
-(setq-default TeX-master nil)
+; (load "auctex.el" nil t t)
+; (setq TeX-auto-save t)
+; (setq TeX-parse-self t)
+; (setq-default TeX-master nil)
+
+;; Project Management
+;(load "eproject")
 
 ;; Project management, prefix key is "C-c p"
 (require 'projectile)
-(projectile-mode)
+(projectile-mode +1)
 (define-key projectile-mode-map (kbd "C-c p") 'projectile-command-map)
-(require 'neotree)
-(global-set-key [f8] 'neotree-toggle)
+
+;(require 'neotree)
+(global-set-key [f8] 'treemacs)
 
 ;; General Programming Settings
 (require 'google-c-style)
@@ -325,7 +336,7 @@ Return a list of installed packages or nil for every skipped package."
   ;(local-set-key (kbd "C-c C-r") 'gud-cont)
   ;(local-set-key (kbd "<f5>") 'gud-cont)
   ;(local-set-key (kbd "C-c C-s") 'gud-step)
-  ;(local-set-key (kbd "<f7>") 'gud-next)
+  ;(local-set-key (kbd "<f7>") 'gud-step)
   ;(local-set-key (kbd "C-c C-n") 'gud-next)
   ;(local-set-key (kbd "<f8>") 'gud-next)
   ;(local-set-key (kbd "C-c C-u") 'gud-up)
@@ -334,34 +345,43 @@ Return a list of installed packages or nil for every skipped package."
   )
 (add-hook 'c-mode-common-hook 'my-c-mode-common-hook)
 
-(require 'flycheck-rtags)
-(defun my-rtags-hook ()
-  "Set up rtags for use in C/C++/Objective-C."
-  (rtags-start-process-unless-running)
-  (rtags-diagnostics)
-  (rtags-enable-standard-keybindings)
-  (flycheck-select-checker 'rtags)
-  (setq-local flycheck-highlighting-mode nil)  ;; RTags creates more accurate overlays.
-  (setq-local flycheck-check-syntax-automatically nil))
-(add-hook 'c-mode-hook 'my-rtags-hook)
-(add-hook 'c++-mode-hook 'my-rtags-hook)
-(add-hook 'objc-mode-hook 'my-rtags-hook)
+(message "Checkpoint 10")
+; (require 'flycheck-rtags)
+; (defun my-rtags-hook ()
+;   "Set up rtags for use in C/C++/Objective-C."
+;   (rtags-start-process-unless-running)
+;   (rtags-diagnostics)
+;   (rtags-enable-standard-keybindings)
+;   (flycheck-select-checker 'rtags)
+;   (setq-local flycheck-highlighting-mode nil)  ;; RTags creates more accurate overlays.
+;   (setq-local flycheck-check-syntax-automatically nil))
+; (add-hook 'c-mode-hook 'my-rtags-hook)
+; (add-hook 'c++-mode-hook 'my-rtags-hook)
+; (add-hook 'objc-mode-hook 'my-rtags-hook)
 
-;; Java Debugging JSwat Settings
-;(require 'yasnippet)
-(remove-hook 'jdb-mode-hook 'google-jdb-fix-comint-prompt)
-(defun jswat ()
-  (interactive)
-  (setq google-jdb-jswat-command "~/scripts/jswat-launcher -jdb")
-  (google-jswat))
+(message "Checkpoint 11")
+;; LanguageTool for grammar checks
+(setq langtool-language-tool-jar "~/opt/LanguageTool-4.7/languagetool-commandline.jar")
+;(setq langtool-language-tool-server-jar "~/opt/LanguageTool-4.7/languagetool-server.jar")
+;(use-package 'langtool)
 
 ;; Java Programming Language Settings
-;(require 'semantic/db-javap)
-;(require 'jdee)
-;(require 'jdee-flycheck)
-;(require 'google-java-format)
-;(require 'malabar-mode)
-;(add-to-list 'auto-mode-alist '("\\.java\\'" . malabar-mode))
+; Settings copied from https://github.com/emacs-lsp/lsp-java
+(require 'cc-mode)
+(message "Checkpoint 12")
+(use-package yasnippet :after lsp :config (yas-global-mode))
+(use-package lsp-mode :config (setq lsp-completion-enable-additional-text-edit nil))
+(use-package hydra)
+(use-package company-lsp)
+(message "Checkpoint 13")
+(use-package lsp-ui)
+(use-package lsp-java :after lsp
+  :config (add-hook 'java-mode-hook 'lsp))
+(message "Checkpoint 14")
+(use-package dap-mode :after lsp-mode :config (dap-mode t) (dap-ui-mode t))
+(use-package dap-java :ensure nil :after lsp-java)
+(add-hook 'dap-stopped-hook
+          (lambda (arg) (call-interactively #'dap-hydra)))
 (defun my-java-mode-hook ()
   (google-set-c-style)
   (google-make-newline-indent)
@@ -372,39 +392,44 @@ Return a list of installed packages or nil for every skipped package."
   (c-set-offset 'arglist-cont 'nil)
   (c-set-offset 'arglist-cont-nonempty '++)
   (setq-local fill-column 100)
-  (fci-mode)
-  (auto-complete-mode)
-  (setq ac-sources
-        '(ac-source-gtags
-          ac-source-words-in-same-mode-buffers
-          ac-source-abbrev
-          ac-source-dictionary))
-  ;(local-set-key (kbd "C-c i") 'google-imports-add-import-from-tag)
-  ;(local-set-key (kbd "C-c i") 'google-imports-jade)
-  ;(local-set-key (kbd "C-c f") #'google-java-format-region)
-  ;(google-set-java-style)
+  (setq-local mode-require-final-newline 't)
+  (column-marker-1 100)
+  ;(auto-complete-mode)
+  (setq tab-width 2)
+  ;(setq ac-sources
+  ;      '(ac-source-gtags
+  ;        ac-source-words-in-same-mode-buffers
+  ;        ac-source-abbrev
+  ;        ac-source-dictionary))
+  (local-set-key (kbd "C-c i") 'lsp-java-add-import)
+  (local-set-key (kbd "C-c .") 'lsp-goto-implementation)
+  (local-set-key (kbd "C-c t") 'lsp-goto-type-definition)
+  (local-set-key (kbd "C-c /") 'company-complete)
   ;(add-hook 'before-save-hook 'google-imports-organize-imports nil t))
   )
 (add-hook 'java-mode-hook 'my-java-mode-hook)
+(add-hook 'java-mode-hook 'lsp)
 
-;; JavaScript Programming Language Settings
-(require 'ac-js2)
-(require 'js2-mode)
-(add-to-list 'auto-mode-alist '("\\.js\\'" . js2-mode))
-(defun my-js2-mode-hook ()
-  (if (string-match "/google3\\(/\\|$\\)" (pwd))
-      (progn
-        (local-set-key (kbd "M-.") 'gtags-find-tag)
-        (local-set-key (kbd "M-*") 'gtags-pop-tag)
-        (local-set-key (kbd "M-g n") 'gtags-next-tag)
-        (local-set-key (kbd "M-g p") 'gtags-previous-tag))
-    (progn
-      ;(gtags-update-after-save-hook)
-      (local-set-key (kbd "M-*") 'pop-tag-mark)
-      (ggtags-mode)))
-  (ac-js2-mode)
-  (setq-local fill-column 80))
-(add-hook 'js2-mode-hook 'my-js2-mode-hook)
+;; Drools mode rules: https://docs.jboss.org/drools/release/5.2.0.Final/drools-expert-docs/html/ch05.html
+; (autoload 'drools-mode "drools-mode")
+; 
+; (defun set-extension-mode (extension mode)
+;   (setq auto-mode-alist
+; 	(cons (cons (concat "\\" extension "\\'") mode)
+; 	      auto-mode-alist) ) )
+; 
+; (set-extension-mode ".drl" 'drools-mode)
+; (set-extension-mode ".dslr" 'drools-mode)
+;
+;(add-hook 'drools-mode-hook 'my-drools-hook)
+; 
+; (defun drools-return-and-indent()
+;   (interactive)
+;   (newline) (indent-for-tab-command) )
+; 
+; (defun my-drools-hook ()
+;   (setq indent-tabs-mode nil)
+;   (local-set-key [?\C-m] 'drools-return-and-indent) )
 
 
 ;; JSON Pretty Print Function
@@ -414,49 +439,30 @@ Return a list of installed packages or nil for every skipped package."
   (shell-command-on-region start end "python -m json.tool" :replace=true)
 )
 
+(message "Checkpoint 15")
 ;; EBNF Settings
 (autoload 'ebnf-mode "ebnf-mode" "Major mode for editing EBNF grammars." t)
 (add-to-list 'auto-mode-alist '("\\.ebnf\\'" . ebnf-mode))
-
-
-;; D Programming Language Settings
-(require 'ac-dcd)
-(autoload 'd-mode "d-mode" "Major mode for editing D code." t)
-(add-to-list 'auto-mode-alist '("\\.d[i]?\\'" . d-mode))
-(add-hook 'd-mode-hook 'ac-dcd-setup)
-(defun my-d-mode-hook ()
-  "My settings for d-mode."
-  (setq-local show-trailing-whitespace t)
-  (setq-local fill-column 100)
-  (fci-mode)
-  (c-set-offset 'func-decl-cont 'nil)
-  (c-set-offset 'arglist-intro '++)
-  (c-set-offset 'arglist-cont 'nil)
-  (c-set-offset 'arglist-cont-nonempty '++)
-  (c-set-offset 'case-label '+)
-  (c-set-offset 'statement-cont '++)
-  (company-dcd-mode)
-  )
-(add-hook 'd-mode-hook 'my-d-mode-hook)
-
+(message "Checkpoint 16")
 
 ;; Web Mode - http://web-mode.org/
-(require 'web-mode)
-(add-to-list 'auto-mode-alist '("\\.phtml\\'" . web-mode))
-(add-to-list 'auto-mode-alist '("\\.tpl\\.php\\'" . web-mode))
-(add-to-list 'auto-mode-alist '("\\.jsp\\'" . web-mode))
-(add-to-list 'auto-mode-alist '("\\.as[cp]x\\'" . web-mode))
-(add-to-list 'auto-mode-alist '("\\.erb\\'" . web-mode))
-(add-to-list 'auto-mode-alist '("\\.mustache\\'" . web-mode))
-(add-to-list 'auto-mode-alist '("\\.djhtml\\'" . web-mode))
-(add-to-list 'auto-mode-alist '("\\.html?\\'" . web-mode))
-(add-to-list 'auto-mode-alist '("\\.soy\\'" . web-mode))
-(setq web-mode-style-padding 2)
-(setq web-mode-script-padding 2)
-(setq web-mode-markup-indent-offset 2)
-(setq web-mode-css-indent-offset 2)
-(setq web-mode-code-indent-offset 2)
-(set-face-attribute 'web-mode-html-tag-face nil :foreground "Blue")
+;(require 'web-mode)
+;(add-to-list 'auto-mode-alist '("\\.js\\'" . web-mode))
+;(add-to-list 'auto-mode-alist '("\\.phtml\\'" . web-mode))
+;(add-to-list 'auto-mode-alist '("\\.tpl\\.php\\'" . web-mode))
+;(add-to-list 'auto-mode-alist '("\\.jsp\\'" . web-mode))
+;(add-to-list 'auto-mode-alist '("\\.as[cp]x\\'" . web-mode))
+;(add-to-list 'auto-mode-alist '("\\.erb\\'" . web-mode))
+;(add-to-list 'auto-mode-alist '("\\.mustache\\'" . web-mode))
+;(add-to-list 'auto-mode-alist '("\\.djhtml\\'" . web-mode))
+;(add-to-list 'auto-mode-alist '("\\.html?\\'" . web-mode))
+;(add-to-list 'auto-mode-alist '("\\.soy\\'" . web-mode))
+;(setq web-mode-style-padding 2)
+;(setq web-mode-script-padding 2)
+;(setq web-mode-markup-indent-offset 2)
+;(setq web-mode-css-indent-offset 2)
+;(setq web-mode-code-indent-offset 2)
+;(set-face-attribute 'web-mode-html-tag-face nil :foreground "Blue")
 
 
 ;; Show the directory in the mode-line.
@@ -471,6 +477,11 @@ Return a list of installed packages or nil for every skipped package."
 ;; Easy file lookup.
 (ffap-bindings)
 
+;; Docker
+(message "Checkpoint 17")
+(require 'dockerfile-mode)
+(add-to-list 'auto-mode-alist '("Dockerfile\\'" . dockerfile-mode))
+(message "Checkpoint 18")
 
 ;; W3M Web-Browsing Settings
 ;(require 'w3m-load)
@@ -493,23 +504,22 @@ Return a list of installed packages or nil for every skipped package."
 ;; OpenGrok Tag Searching
 ;(require 'opengrok)
 
+(message "Checkpoint 19")
 ;; Org-mode settings
 (defun my-org-mode-hook ()
   "My settings for org-mode."
+  (require 'ox-gfm)
+  (require 'org-ac)
+  (org-ac/config-default)
   (setq-local fill-column 100)
-  (fci-mode)
   (setq-local show-trailing-whitespace t))
 (add-hook 'org-mode-hook 'my-org-mode-hook)
 (setq org-src-fontify-natively t)
 (setq org-confirm-babel-evaluate nil)
-; Export to Github Flavored Markdown.
-(require 'ox-gfm)
-; Set up org autocomplete sources.
-(require 'org-ac)
-(org-ac/config-default)
-; PlantUML Support in org-mode.
-(require 'ob-plantuml)
-
+; Avoid spellchecks on code snippets.
+(add-to-list 'ispell-skip-region-alist '(":\\(PROPERTIES\\|LOGBOOK\\):" . ":END:"))
+(add-to-list 'ispell-skip-region-alist '("#\\+BEGIN_SRC" . "#\\+END_SRC"))
+(message "Checkpoint 20")
 
 ;; Personal preferences and customizations.
 (setq-default indicate-empty-lines t)
@@ -519,70 +529,116 @@ Return a list of installed packages or nil for every skipped package."
  ;; If you edit it by hand, you could mess it up, so be careful.
  ;; Your init file should contain only one such instance.
  ;; If there is more than one, they won't work right.
- '(ac-delay 0.2)
+ '(ac-delay 0.5)
  '(ac-non-trigger-commands
-   (quote
-    (*table--cell-self-insert-command electric-buffer-list org-cycle)))
+   '(*table--cell-self-insert-command electric-buffer-list org-cycle))
  '(ac-use-fuzzy t)
+ '(ag-highlight-search t)
  '(ansi-color-faces-vector
    [default default default italic underline success warning error])
  '(ansi-color-names-vector
-   ["dim gray" "red" "green" "yellow" "steel blue" "magenta" "cyan" "white"])
+   ["black" "red3" "ForestGreen" "yellow3" "RoyalBlue3" "magenta3" "DeepSkyBlue" "gray50"])
+ '(auth-source-save-behavior nil)
  '(bookmark-save-flag 1)
  '(calendar-week-start-day 1)
  '(column-number-mode t)
- '(custom-enabled-themes (quote (leuven)))
+ '(compilation-auto-jump-to-first-error nil)
+ '(custom-enabled-themes '(leuven))
  '(custom-safe-themes
-   (quote
-    ("2e1e2657303116350fe764484e8300ca2e4cf45a73cdbd879bc0ca29cb337147" "43c1a8090ed19ab3c0b1490ce412f78f157d69a29828aa977dae941b994b4147" "ad9747dc51ca23d1c1382fa9bd5d76e958a5bfe179784989a6a666fe801aadf2" "b04d091b3315afedc67e4e2e9950c272789804cf0cb7e93750d70475a47b935b" "1e7e097ec8cb1f8c3a912d7e1e0331caeed49fef6cff220be63bd2a6ba4cc365" "fc5fcb6f1f1c1bc01305694c59a1a861b008c534cae8d0e48e4d5e81ad718bc6" "aecea99f23d116cd33dabe34b9df808816c374328c064fcf12d15cecc3735237" default)))
+   '("039c01abb72985a21f4423dd480ddb998c57d665687786abd4e16c71128ef6ad" "89885317e7136d4e86fb842605d47d8329320f0326b62efa236e63ed4be23c58" "7922b14d8971cce37ddb5e487dbc18da5444c47f766178e5a4e72f90437c0711" "3cd4f09a44fe31e6dd65af9eb1f10dc00d5c2f1db31a427713a1784d7db7fdfc" "68d8ceaedfb6bdd2909f34b8b51ceb96d7a43f25310a55c701811f427e9de3a3" "672bb062b9c92e62d7c370897b131729c3f7fd8e8de71fc00d70c5081c80048c" "d8dc153c58354d612b2576fea87fe676a3a5d43bcc71170c62ddde4a1ad9e1fb" "732b807b0543855541743429c9979ebfb363e27ec91e82f463c91e68c772f6e3" "a24c5b3c12d147da6cef80938dca1223b7c7f70f2f382b26308eba014dc4833a" "170bb47b35baa3d2439f0fd26b49f4278e9a8decf611aa33a0dad1397620ddc3" "fa2af0c40576f3bde32290d7f4e7aa865eb6bf7ebe31eb9e37c32aa6f4ae8d10" "028de01489a683696c64dcc2a01eaa663670d04202de3fce48ec3a5542bc2da5" "28bf1b0a72e3a1e08242d776c5befc44ba67a36ced0e55df27cfc7ae6be6c24d" "d70c11f5a2b69a77f9d56eff42090138721d4c51d9d39ce986680786d694f492" "ec5f697561eaf87b1d3b087dd28e61a2fc9860e4c862ea8e6b0b77bd4967d0ba" "0c71e4d0b5ad79a7cb155f180adcc93f2fe5ae3d3a863de7d3a8c898087d890c" "2e1e2657303116350fe764484e8300ca2e4cf45a73cdbd879bc0ca29cb337147" "43c1a8090ed19ab3c0b1490ce412f78f157d69a29828aa977dae941b994b4147" "ad9747dc51ca23d1c1382fa9bd5d76e958a5bfe179784989a6a666fe801aadf2" "b04d091b3315afedc67e4e2e9950c272789804cf0cb7e93750d70475a47b935b" "1e7e097ec8cb1f8c3a912d7e1e0331caeed49fef6cff220be63bd2a6ba4cc365" "fc5fcb6f1f1c1bc01305694c59a1a861b008c534cae8d0e48e4d5e81ad718bc6" "aecea99f23d116cd33dabe34b9df808816c374328c064fcf12d15cecc3735237" default))
  '(delete-trailing-lines nil)
  '(ecb-options-version "2.40")
- '(even-window-heights t)
+ '(even-window-sizes t)
+ '(fci-rule-color "#37474f")
  '(fill-column 100)
  '(gcomplete-jump-to-def-binding [ignore])
  '(generic-extras-enable-list
-   (quote
-    (alias-generic-mode apache-conf-generic-mode apache-log-generic-mode etc-fstab-generic-mode etc-modules-conf-generic-mode etc-passwd-generic-mode etc-services-generic-mode etc-sudoers-generic-mode fvwm-generic-mode hosts-generic-mode inetd-conf-generic-mode ini-generic-mode java-manifest-generic-mode java-properties-generic-mode javascript-generic-mode mailagent-rules-generic-mode mailrc-generic-mode named-boot-generic-mode named-database-generic-mode prototype-generic-mode resolve-conf-generic-mode samba-generic-mode show-tabs-generic-mode vrml-generic-mode x-resource-generic-mode xmodmap-generic-mode)))
+   '(alias-generic-mode apache-conf-generic-mode apache-log-generic-mode etc-fstab-generic-mode etc-modules-conf-generic-mode etc-passwd-generic-mode etc-services-generic-mode etc-sudoers-generic-mode fvwm-generic-mode hosts-generic-mode inetd-conf-generic-mode ini-generic-mode java-manifest-generic-mode java-properties-generic-mode javascript-generic-mode mailagent-rules-generic-mode mailrc-generic-mode named-boot-generic-mode named-database-generic-mode prototype-generic-mode resolve-conf-generic-mode samba-generic-mode show-tabs-generic-mode vrml-generic-mode x-resource-generic-mode xmodmap-generic-mode))
+ '(global-auto-revert-mode t)
  '(grep-command "grep --color -nHE -e ")
- '(grep-find-command
-   (quote
-    ("find . -type f -exec grep --color -nHE -e  {} +" . 43)))
+ '(grep-find-command '("find . -type f -exec grep --color -nHE -e  {} +" . 43))
  '(grep-find-ignored-files
-   (quote
-    (".#*" "*.o" "*~" "*.bin" "*.lbin" "*.so" "*.a" "*.ln" "*.blg" "*.bbl" "*.elc" "*.lof" "*.glo" "*.idx" "*.lot" "*.fmt" "*.tfm" "*.class" "*.fas" "*.lib" "*.mem" "*.x86f" "*.sparcf" "*.dfsl" "*.pfsl" "*.d64fsl" "*.p64fsl" "*.lx64fsl" "*.lx32fsl" "*.dx64fsl" "*.dx32fsl" "*.fx64fsl" "*.fx32fsl" "*.sx64fsl" "*.sx32fsl" "*.wx64fsl" "*.wx32fsl" "*.fasl" "*.ufsl" "*.fsl" "*.dxl" "*.lo" "*.la" "*.gmo" "*.mo" "*.toc" "*.aux" "*.cp" "*.fn" "*.ky" "*.pg" "*.tp" "*.vr" "*.cps" "*.fns" "*.kys" "*.pgs" "*.tps" "*.vrs" "*.pyc" "*.pyo" "#*#" "GPATH" "GRTAGS" "GSYMS" "GTAGS" "*.jar" "*.iml")))
+   '(".#*" "*.o" "*~" "*.bin" "*.lbin" "*.so" "*.a" "*.ln" "*.blg" "*.bbl" "*.elc" "*.lof" "*.glo" "*.idx" "*.lot" "*.fmt" "*.tfm" "*.class" "*.fas" "*.lib" "*.mem" "*.x86f" "*.sparcf" "*.dfsl" "*.pfsl" "*.d64fsl" "*.p64fsl" "*.lx64fsl" "*.lx32fsl" "*.dx64fsl" "*.dx32fsl" "*.fx64fsl" "*.fx32fsl" "*.sx64fsl" "*.sx32fsl" "*.wx64fsl" "*.wx32fsl" "*.fasl" "*.ufsl" "*.fsl" "*.dxl" "*.lo" "*.la" "*.gmo" "*.mo" "*.toc" "*.aux" "*.cp" "*.fn" "*.ky" "*.pg" "*.tp" "*.vr" "*.cps" "*.fns" "*.kys" "*.pgs" "*.tps" "*.vrs" "*.pyc" "*.pyo" "#*#" "GPATH" "GRTAGS" "GSYMS" "GTAGS" "*.jar" "*.iml"))
  '(grep-find-template
    "find . <X> -type f <F> -exec grep <C> --color -nHE -e <R> {} +")
+ '(groovy-indent-offset 2)
+ '(gud-tooltip-modes '(gud-mode c-mode c++-mode fortran-mode python-mode d-mode))
  '(hl-sexp-background-color "#efebe9")
+ '(indent-tabs-mode nil)
  '(jdee-server-dir "~/bin")
  '(js-indent-level 2)
- '(js2-basic-offset 2)
  '(js2-bounce-indent-p t)
  '(js2-global-externs nil)
  '(js2-include-node-externs t)
- '(js2-init-hook (quote (my-c-mode-common-hook)))
- '(org-ac/ac-trigger-command-keys (quote ("\\" "SPC" ":" "[" "+")))
+ '(js2-init-hook '(my-c-mode-common-hook))
+ '(lsp-enable-on-type-formatting nil)
+ '(lsp-java-autobuild-enabled nil)
+ '(lsp-java-completion-guess-method-arguments t)
+ '(lsp-java-completion-import-order [])
+ '(lsp-java-vmargs
+   '("-noverify" "-Xmx1G" "-XX:+UseG1GC" "-XX:+UseStringDeduplication" "-javaagent:/home/vnayar/.m2/repository/org/projectlombok/lombok/1.18.12/lombok-1.18.12.jar"))
+ '(lsp-ui-doc-delay 0.8)
+ '(lsp-ui-sideline-enable nil)
+ '(org-ac/ac-trigger-command-keys '("*" "SPC" ":" "["))
  '(org-babel-load-languages
-   (quote
-    ((emacs-lisp . t)
+   '((emacs-lisp . t)
      (plantuml . t)
-     (gnuplot . t)
      (shell . t)
-     (R . t))))
- '(org-export-with-toc 4)
- '(org-link-file-path-type (quote relative))
+     (js . t)
+     (R . t)))
+ '(org-clock-clocked-in-display 'frame-title)
+ '(org-duration-format 'h:mm)
+ '(org-export-with-sub-superscripts '{})
+ '(org-latex-image-default-width "1.2\\linewidth")
+ '(org-link-file-path-type 'relative)
+ '(org-list-description-max-indent 4)
+ '(org-odt-create-custom-styles-for-srcblocks t)
+ '(org-odt-fontify-srcblocks t)
  '(org-plantuml-jar-path "/home/vnayar/bin/plantuml.jar")
- '(org-todo-keywords (quote ((sequence "TODO" "WAIT" "DONE"))))
- '(peg-mode-hook (quote (my-peg-mode-hook)))
+ '(org-time-clocksum-format
+   '(:hours "%d" :require-hours t :minutes ":%02d" :require-minutes t))
+ '(org-todo-keywords '((sequence "TODO" "WAIT" "DONE")))
+ '(package-selected-packages
+   '(lsp-java protobuf-mode csv csv-mode lsp-mode dap-mode lsp-treemacs lsp-ui posframe ag dockerfile-mode w3m rjsx-mode typescript-mode groovy-mode magit k8s-mode flycheck-plantuml terraform-doc terraform-mode ox-json flycheck-d-unittest gnu-elpa-keyring-update company-lsp abyss-theme gh-md material-theme unicode-math-input sdlang-mode gnuplot-mode w3 top-mode sr-speedbar peg ox-trac ox-mediawiki ox-gfm org-ac ob-kotlin nyx-theme neotree java-snippets grizzl gradle-mode google-c-style git ggtags fuzzy eproject company-dcd column-marker color-theme-buffer-local apache-mode ac-rtags ac-js2 ac-alchemist))
+ '(peg-mode-hook '(my-peg-mode-hook))
+ '(plantuml-indent-level 2)
+ '(projectile-completion-system 'ido)
  '(rtags-install-path nil)
  '(rtags-path "~/src/rtags/bin")
  '(rtags-reindex-on-save t)
  '(scroll-bar-mode nil)
  '(show-paren-mode t)
- '(tool-bar-mode nil))
+ '(tool-bar-mode nil)
+ '(vc-annotate-background nil)
+ '(vc-annotate-color-map
+   '((20 . "#f36c60")
+     (40 . "#ff9800")
+     (60 . "#fff59d")
+     (80 . "#8bc34a")
+     (100 . "#81d4fa")
+     (120 . "#4dd0e1")
+     (140 . "#b39ddb")
+     (160 . "#f36c60")
+     (180 . "#ff9800")
+     (200 . "#fff59d")
+     (220 . "#8bc34a")
+     (240 . "#81d4fa")
+     (260 . "#4dd0e1")
+     (280 . "#b39ddb")
+     (300 . "#f36c60")
+     (320 . "#ff9800")
+     (340 . "#fff59d")
+     (360 . "#8bc34a")))
+ '(vc-annotate-very-old-color nil)
+ '(web-mode-code-indent-offset 2)
+ '(web-mode-css-indent-offset 2)
+ '(web-mode-markup-indent-offset 2))
 (custom-set-faces
  ;; custom-set-faces was added by Custom.
  ;; If you edit it by hand, you could mess it up, so be careful.
  ;; Your init file should contain only one such instance.
  ;; If there is more than one, they won't work right.
- '(default ((t (:family "WenQuanYi Micro Hei Mono" :foundry "WQYF" :slant normal :weight normal :height 98 :width normal))))
+ '(default ((t (:inherit nil :extend nil :stipple nil :box nil :strike-through nil :overline nil :underline nil :slant normal :weight normal :height 90 :width normal :foundry "SRC" :family "Hack"))))
+ '(lsp-lsp-flycheck-warning-unnecessary-face ((t (:underline (:color "#F4A939" :style wave) :weight bold))) t)
  '(web-mode-html-tag-face ((t (:foreground "steel blue")))))
+(message "Checkpoint 21")
