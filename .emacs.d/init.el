@@ -1,15 +1,40 @@
+;; Modify 'message to include a timestamp.
+; (defun sh/current-time-microseconds ()
+;   "Return the current time formatted to include microseconds."
+;   (let* ((nowtime (current-time))
+;          (now-ms (nth 2 nowtime)))
+;     (concat (format-time-string "[%Y-%m-%dT%T" nowtime) (format ".%d]" now-ms))))
+; 
+; (defun sh/ad-timestamp-message (FORMAT-STRING &rest args)
+;   "Advice to run before `message' that prepends a timestamp to each message.
+; 
+; Activate this advice with:
+; (advice-add 'message :before 'sh/ad-timestamp-message)"
+;   (unless (string-equal FORMAT-STRING "%s%s")
+;     (let ((deactivate-mark nil)
+;           (inhibit-read-only t))
+;       (with-current-buffer "*Messages*"
+;         (goto-char (point-max))
+;         (if (not (bolp))
+;           (newline))
+;         (insert (sh/current-time-microseconds) " ")))))
+; 
+; (advice-add 'message :before 'sh/ad-timestamp-message)
+;; END TIMING
+
 ;; Allow us to import custom modules.
 ; Workaround for a bug in Emacs 26.1
 (setq gnutls-algorithm-priority "NORMAL:-VERS-TLS1.3")
 (add-to-list 'load-path "~/.emacs.d/lisp/")
-(add-to-list 'load-path "~/.emacs.d/org-9.0.5/lisp")
-(add-to-list 'load-path "~/.emacs.d/org-9.0.5/contrib/lisp")
+;(add-to-list 'load-path "~/.emacs.d/org-9.0.5/lisp")
+;(add-to-list 'load-path "~/.emacs.d/org-9.0.5/contrib/lisp")
 (add-to-list 'load-path "/usr/share/emacs/site-lisp/")
 
 ;; Dive through ~/.emacs.d/elpa packages to add subdirs.
 (when (>= emacs-major-version 24)
   (require 'package)
-  (add-to-list 'package-archives '("org" . "http://orgmode.org/elpa/") t)
+  ;; Org ELPA is closing before Org 9.6.
+  ;(add-to-list 'package-archives '("org" . "http://orgmode.org/elpa/") t)
   (add-to-list 'package-archives '("melpa" . "https://melpa.org/packages/") t)
   (package-initialize))
 
@@ -68,6 +93,7 @@
     (c-set-offset 'arglist-cont-nonempty '++)
     (c-set-offset 'case-label '+)
     (c-set-offset 'statement-cont '++)
+    (setq tab-width 2)
     (company-dcd-mode))
   (add-hook 'd-mode-hook 'my-d-mode-hook))
 
@@ -92,8 +118,7 @@
     (column-number-mode 1)
     (show-paren-mode 1)
     (setq-local fill-column 100)
-    (setq-local show-trailing-whitespace t)
-    (setq plantuml-indent-offset 2))
+    (setq-local show-trailing-whitespace t))
   (defun plantuml-compile ()
     "Compile a PlantUML file into images."
     (interactive)
@@ -117,6 +142,13 @@
   :mode "\\.js\\'"
   :init
   (setq create-lockfiles nil))
+(defun my-rjsx-mode-hook ()
+  (local-set-key (kbd "C-c .") 'lsp-find-definition)
+  (local-set-key (kbd "C-c r") 'lsp-find-references)
+  (local-set-key (kbd "C-c /") 'company-complete)
+  )
+(add-hook 'rjsx-mode-hook 'my-rjsx-mode-hook)
+(add-hook 'rjsx-mode-hook 'lsp)
 
 ;(use-package w3m)
 
@@ -225,15 +257,16 @@
             (define-key comint-mode-map "\C-w" 'comint-kill-region)
             (define-key comint-mode-map [C-S-backspace]
               'comint-kill-whole-line)))
-(defun my-shell-mode-hook ()
+(defun my-sh-mode-hook ()
   "Commands to run for shell-mode."
   ;(auto-complete-mode)
+  (setq sh-basic-offset 2)
   ;(setq ac-delay 0.5)
   ;(setq ac-sources
   ;      '(ac-source-files-in-current-dir
   ;        ac-source-filename))
   )
-(add-hook 'shell-mode-hook 'my-shell-mode-hook)
+(add-hook 'sh-mode-hook 'my-sh-mode-hook)
 
 (message "Checkpoint 7")
 ;; Mode settings for editing shell scripts.
@@ -374,7 +407,7 @@
 (use-package hydra)
 (use-package company-lsp)
 (message "Checkpoint 13")
-(use-package lsp-ui)
+(use-package lsp-ui :after lsp)
 (use-package lsp-java :after lsp
   :config (add-hook 'java-mode-hook 'lsp))
 (message "Checkpoint 14")
@@ -402,13 +435,29 @@
   ;        ac-source-abbrev
   ;        ac-source-dictionary))
   (local-set-key (kbd "C-c i") 'lsp-java-add-import)
-  (local-set-key (kbd "C-c .") 'lsp-goto-implementation)
-  (local-set-key (kbd "C-c t") 'lsp-goto-type-definition)
+  (local-set-key (kbd "C-c .") 'lsp-find-definition)
+  (local-set-key (kbd "C-c r") 'lsp-find-references)
   (local-set-key (kbd "C-c /") 'company-complete)
   ;(add-hook 'before-save-hook 'google-imports-organize-imports nil t))
   )
 (add-hook 'java-mode-hook 'my-java-mode-hook)
 (add-hook 'java-mode-hook 'lsp)
+
+;; Dart configuration
+; See https://emacs-lsp.github.io/lsp-dart/
+(defun my-dart-mode-hook ()
+  (local-set-key (kbd "C-c .") 'lsp-find-definition)
+  (local-set-key (kbd "C-c r") 'lsp-find-references)
+  (local-set-key (kbd "C-c /") 'company-complete)
+  )
+(add-hook 'dart-mode-hook 'my-dart-mode-hook)
+(add-hook 'dart-mode-hook 'lsp)
+(setq gc-cons-threshold (* 100 1024 1024)
+      read-process-output-max (* 1024 1024)
+      company-minimum-prefix-length 1
+      lsp-lens-enable t
+      lsp-signature-auto-activate nil)
+(setenv "FLUTTER_ROOT" "/home/vnayar/opt/flutter")
 
 ;; Drools mode rules: https://docs.jboss.org/drools/release/5.2.0.Final/drools-expert-docs/html/ch05.html
 ; (autoload 'drools-mode "drools-mode")
@@ -430,7 +479,6 @@
 ; (defun my-drools-hook ()
 ;   (setq indent-tabs-mode nil)
 ;   (local-set-key [?\C-m] 'drools-return-and-indent) )
-
 
 ;; JSON Pretty Print Function
 (defun json-pretty-print (start end)
@@ -464,7 +512,6 @@
 ;(setq web-mode-code-indent-offset 2)
 ;(set-face-attribute 'web-mode-html-tag-face nil :foreground "Blue")
 
-
 ;; Show the directory in the mode-line.
 (defun add-mode-line-dirtrack ()
   "When editing a file, show the last 2 directories of the current path in the mode line."
@@ -472,7 +519,6 @@
                '(:eval (substring default-directory
                                   (+ 1 (string-match "/[^/]+/[^/]+/$" default-directory)) nil))))
 (add-hook 'find-file-hook 'add-mode-line-dirtrack)
-
 
 ;; Easy file lookup.
 (ffap-bindings)
@@ -512,7 +558,9 @@
   (require 'org-ac)
   (org-ac/config-default)
   (setq-local fill-column 100)
-  (setq-local show-trailing-whitespace t))
+  (setq-local show-trailing-whitespace t)
+  (auto-complete-mode 0)
+  (electric-indent-mode 0))
 (add-hook 'org-mode-hook 'my-org-mode-hook)
 (setq org-src-fontify-natively t)
 (setq org-confirm-babel-evaluate nil)
@@ -545,12 +593,13 @@
  '(compilation-auto-jump-to-first-error nil)
  '(custom-enabled-themes '(leuven))
  '(custom-safe-themes
-   '("039c01abb72985a21f4423dd480ddb998c57d665687786abd4e16c71128ef6ad" "89885317e7136d4e86fb842605d47d8329320f0326b62efa236e63ed4be23c58" "7922b14d8971cce37ddb5e487dbc18da5444c47f766178e5a4e72f90437c0711" "3cd4f09a44fe31e6dd65af9eb1f10dc00d5c2f1db31a427713a1784d7db7fdfc" "68d8ceaedfb6bdd2909f34b8b51ceb96d7a43f25310a55c701811f427e9de3a3" "672bb062b9c92e62d7c370897b131729c3f7fd8e8de71fc00d70c5081c80048c" "d8dc153c58354d612b2576fea87fe676a3a5d43bcc71170c62ddde4a1ad9e1fb" "732b807b0543855541743429c9979ebfb363e27ec91e82f463c91e68c772f6e3" "a24c5b3c12d147da6cef80938dca1223b7c7f70f2f382b26308eba014dc4833a" "170bb47b35baa3d2439f0fd26b49f4278e9a8decf611aa33a0dad1397620ddc3" "fa2af0c40576f3bde32290d7f4e7aa865eb6bf7ebe31eb9e37c32aa6f4ae8d10" "028de01489a683696c64dcc2a01eaa663670d04202de3fce48ec3a5542bc2da5" "28bf1b0a72e3a1e08242d776c5befc44ba67a36ced0e55df27cfc7ae6be6c24d" "d70c11f5a2b69a77f9d56eff42090138721d4c51d9d39ce986680786d694f492" "ec5f697561eaf87b1d3b087dd28e61a2fc9860e4c862ea8e6b0b77bd4967d0ba" "0c71e4d0b5ad79a7cb155f180adcc93f2fe5ae3d3a863de7d3a8c898087d890c" "2e1e2657303116350fe764484e8300ca2e4cf45a73cdbd879bc0ca29cb337147" "43c1a8090ed19ab3c0b1490ce412f78f157d69a29828aa977dae941b994b4147" "ad9747dc51ca23d1c1382fa9bd5d76e958a5bfe179784989a6a666fe801aadf2" "b04d091b3315afedc67e4e2e9950c272789804cf0cb7e93750d70475a47b935b" "1e7e097ec8cb1f8c3a912d7e1e0331caeed49fef6cff220be63bd2a6ba4cc365" "fc5fcb6f1f1c1bc01305694c59a1a861b008c534cae8d0e48e4d5e81ad718bc6" "aecea99f23d116cd33dabe34b9df808816c374328c064fcf12d15cecc3735237" default))
+   '("171d1ae90e46978eb9c342be6658d937a83aaa45997b1d7af7657546cae5985b" "cf9414f229f6df728eb2a5a9420d760673cca404fee9910551caf9c91cff3bfa" "039c01abb72985a21f4423dd480ddb998c57d665687786abd4e16c71128ef6ad" "89885317e7136d4e86fb842605d47d8329320f0326b62efa236e63ed4be23c58" "7922b14d8971cce37ddb5e487dbc18da5444c47f766178e5a4e72f90437c0711" "3cd4f09a44fe31e6dd65af9eb1f10dc00d5c2f1db31a427713a1784d7db7fdfc" "68d8ceaedfb6bdd2909f34b8b51ceb96d7a43f25310a55c701811f427e9de3a3" "672bb062b9c92e62d7c370897b131729c3f7fd8e8de71fc00d70c5081c80048c" "d8dc153c58354d612b2576fea87fe676a3a5d43bcc71170c62ddde4a1ad9e1fb" "732b807b0543855541743429c9979ebfb363e27ec91e82f463c91e68c772f6e3" "a24c5b3c12d147da6cef80938dca1223b7c7f70f2f382b26308eba014dc4833a" "170bb47b35baa3d2439f0fd26b49f4278e9a8decf611aa33a0dad1397620ddc3" "fa2af0c40576f3bde32290d7f4e7aa865eb6bf7ebe31eb9e37c32aa6f4ae8d10" "028de01489a683696c64dcc2a01eaa663670d04202de3fce48ec3a5542bc2da5" "28bf1b0a72e3a1e08242d776c5befc44ba67a36ced0e55df27cfc7ae6be6c24d" "d70c11f5a2b69a77f9d56eff42090138721d4c51d9d39ce986680786d694f492" "ec5f697561eaf87b1d3b087dd28e61a2fc9860e4c862ea8e6b0b77bd4967d0ba" "0c71e4d0b5ad79a7cb155f180adcc93f2fe5ae3d3a863de7d3a8c898087d890c" "2e1e2657303116350fe764484e8300ca2e4cf45a73cdbd879bc0ca29cb337147" "43c1a8090ed19ab3c0b1490ce412f78f157d69a29828aa977dae941b994b4147" "ad9747dc51ca23d1c1382fa9bd5d76e958a5bfe179784989a6a666fe801aadf2" "b04d091b3315afedc67e4e2e9950c272789804cf0cb7e93750d70475a47b935b" "1e7e097ec8cb1f8c3a912d7e1e0331caeed49fef6cff220be63bd2a6ba4cc365" "fc5fcb6f1f1c1bc01305694c59a1a861b008c534cae8d0e48e4d5e81ad718bc6" "aecea99f23d116cd33dabe34b9df808816c374328c064fcf12d15cecc3735237" default))
  '(delete-trailing-lines nil)
  '(ecb-options-version "2.40")
  '(even-window-sizes t)
  '(fci-rule-color "#37474f")
  '(fill-column 100)
+ '(flycheck-idle-change-delay 2.5)
  '(gcomplete-jump-to-def-binding [ignore])
  '(generic-extras-enable-list
    '(alias-generic-mode apache-conf-generic-mode apache-log-generic-mode etc-fstab-generic-mode etc-modules-conf-generic-mode etc-passwd-generic-mode etc-services-generic-mode etc-sudoers-generic-mode fvwm-generic-mode hosts-generic-mode inetd-conf-generic-mode ini-generic-mode java-manifest-generic-mode java-properties-generic-mode javascript-generic-mode mailagent-rules-generic-mode mailrc-generic-mode named-boot-generic-mode named-database-generic-mode prototype-generic-mode resolve-conf-generic-mode samba-generic-mode show-tabs-generic-mode vrml-generic-mode x-resource-generic-mode xmodmap-generic-mode))
@@ -571,6 +620,7 @@
  '(js2-global-externs nil)
  '(js2-include-node-externs t)
  '(js2-init-hook '(my-c-mode-common-hook))
+ '(lsp-dart-flutter-executable "flutter")
  '(lsp-enable-on-type-formatting nil)
  '(lsp-java-autobuild-enabled nil)
  '(lsp-java-completion-guess-method-arguments t)
@@ -579,7 +629,8 @@
    '("-noverify" "-Xmx1G" "-XX:+UseG1GC" "-XX:+UseStringDeduplication" "-javaagent:/home/vnayar/.m2/repository/org/projectlombok/lombok/1.18.12/lombok-1.18.12.jar"))
  '(lsp-ui-doc-delay 0.8)
  '(lsp-ui-sideline-enable nil)
- '(org-ac/ac-trigger-command-keys '("*" "SPC" ":" "["))
+ '(org-ac/ac-trigger-command-keys nil)
+ '(org-adapt-indentation 'headline-data)
  '(org-babel-load-languages
    '((emacs-lisp . t)
      (plantuml . t)
@@ -588,7 +639,9 @@
      (R . t)))
  '(org-clock-clocked-in-display 'frame-title)
  '(org-duration-format 'h:mm)
+ '(org-edit-src-content-indentation 0)
  '(org-export-with-sub-superscripts '{})
+ '(org-indent-indentation-per-level 2)
  '(org-latex-image-default-width "1.2\\linewidth")
  '(org-link-file-path-type 'relative)
  '(org-list-description-max-indent 4)
@@ -599,7 +652,7 @@
    '(:hours "%d" :require-hours t :minutes ":%02d" :require-minutes t))
  '(org-todo-keywords '((sequence "TODO" "WAIT" "DONE")))
  '(package-selected-packages
-   '(lsp-java protobuf-mode csv csv-mode lsp-mode dap-mode lsp-treemacs lsp-ui posframe ag dockerfile-mode w3m rjsx-mode typescript-mode groovy-mode magit k8s-mode flycheck-plantuml terraform-doc terraform-mode ox-json flycheck-d-unittest gnu-elpa-keyring-update company-lsp abyss-theme gh-md material-theme unicode-math-input sdlang-mode gnuplot-mode w3 top-mode sr-speedbar peg ox-trac ox-mediawiki ox-gfm org-ac ob-kotlin nyx-theme neotree java-snippets grizzl gradle-mode google-c-style git ggtags fuzzy eproject company-dcd column-marker color-theme-buffer-local apache-mode ac-rtags ac-js2 ac-alchemist))
+   '(d-mode atom-one-dark-theme tron-legacy-theme lsp-dart dart-mode adoc-mode lsp-java protobuf-mode csv csv-mode lsp-mode dap-mode lsp-treemacs lsp-ui posframe ag dockerfile-mode w3m rjsx-mode typescript-mode groovy-mode magit flycheck-plantuml terraform-doc terraform-mode flycheck-d-unittest gnu-elpa-keyring-update company-lsp abyss-theme gh-md material-theme unicode-math-input sdlang-mode gnuplot-mode w3 top-mode sr-speedbar peg ox-mediawiki ox-gfm org-ac nyx-theme neotree java-snippets grizzl gradle-mode google-c-style git ggtags fuzzy eproject company-dcd column-marker color-theme-buffer-local apache-mode ac-rtags ac-js2 ac-alchemist))
  '(peg-mode-hook '(my-peg-mode-hook))
  '(plantuml-indent-level 2)
  '(projectile-completion-system 'ido)
@@ -638,7 +691,7 @@
  ;; If you edit it by hand, you could mess it up, so be careful.
  ;; Your init file should contain only one such instance.
  ;; If there is more than one, they won't work right.
- '(default ((t (:inherit nil :extend nil :stipple nil :box nil :strike-through nil :overline nil :underline nil :slant normal :weight normal :height 90 :width normal :foundry "SRC" :family "Hack"))))
+ '(default ((t (:inherit nil :extend nil :stipple nil :inverse-video nil :box nil :strike-through nil :overline nil :underline nil :slant normal :weight normal :height 100 :width normal :foundry "SRC" :family "Noto Sans Mono"))))
  '(lsp-lsp-flycheck-warning-unnecessary-face ((t (:underline (:color "#F4A939" :style wave) :weight bold))) t)
  '(web-mode-html-tag-face ((t (:foreground "steel blue")))))
 (message "Checkpoint 21")
