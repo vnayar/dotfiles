@@ -35,6 +35,8 @@
   (require 'package)
   ;; Org ELPA is closing before Org 9.6.
   ;(add-to-list 'package-archives '("org" . "http://orgmode.org/elpa/") t)
+  (add-to-list 'package-archives '("gnu" . "https://elpa.gnu.org/packages/") t)
+  (add-to-list 'package-archives '("nongnu" . "https://elpa.nongnu.org/nongnu/") t)
   (add-to-list 'package-archives '("melpa" . "https://melpa.org/packages/") t)
   (package-initialize))
 
@@ -47,6 +49,9 @@
    (package-refresh-contents)
    (package-install 'use-package)
    (require 'use-package)))
+
+;; A mode for code completion, auto-complete, and other features.
+(require 'eglot)
 
 (message "Checkpoint 1")
 ; Sets the :ensure t property for all use-package calls.
@@ -65,17 +70,27 @@
 ;  :after (ac-js2)
 ;  :bind (("M-*" . pop-tag-mark))
 ;  :config
-;  (defun my-js2-mode-hook ()
-;    (ggtags-mode)
-;    (ac-js2-mode)
-;    (setq-local fill-column 100))
-;  (add-hook 'js2-mode-hook 'my-js2-mode-hook))
+(defun my-js2-mode-hook ()
+  (company-mode)
+  (eglot-ensure)
+  (local-set-key (kbd "C-c .") 'xref-find-definitions)
+  (setq-local fill-column 100))
+(add-hook 'js2-mode-hook 'my-js2-mode-hook)
+; See https://github.com/typescript-language-server/typescript-language-server
+(add-to-list 'eglot-server-programs `(js2-mode . ("/usr/bin/typescript-language-server" "--stdio")))
+
+; Quickly toggle whether automatic word-wrapping is performed while typing.
+(global-set-key (kbd "C-c f") 'auto-fill-mode)
 
 (use-package auto-complete)
 (use-package tex :ensure auctex)
 (use-package bash-completion)
 (use-package column-marker)
 (use-package company)
+
+;; LDAP Settings
+(use-package ldap
+  :mode "\\.ldif")
 
 ;; D Programming Language Settings
 (use-package company-dcd)
@@ -94,8 +109,48 @@
     (c-set-offset 'case-label '+)
     (c-set-offset 'statement-cont '++)
     (setq tab-width 2)
-    (company-dcd-mode))
+    (company-mode)
+    ;(company-dcd-mode)
+    ;(global-set-key (kbd "C-c TAB") 'company-complete))
+    ;(local-set-key (kbd "C-c .") 'lsp-find-definition)
+    (local-set-key (kbd "C-c .") 'xref-find-definitions)
+    (local-set-key (kbd "C-c i") 'imenu)
+    ;(local-set-key (kbd "C-c r") 'lsp-find-references)
+    (local-set-key (kbd "C-c /") 'company-complete)
+    (yas-minor-mode)
+    )
   (add-hook 'd-mode-hook 'my-d-mode-hook))
+
+(use-package sdlang-mode
+  :mode "\\.sdl\\'"
+  :config
+  (defun my-sdlang-mode-hook ()
+    "My settings for sdlang-mode."
+    (setq-local show-trailing-whitespace t)
+    (setq-local fill-column 100)
+    (column-marker-1 100)
+    (setq tab-width 2)
+    (company-mode)
+    )
+  (add-hook 'sdlang-mode-hook 'my-sdlang-mode-hook))
+
+;(with-eval-after-load 'lsp-mode
+;  (lsp-register-client
+;   (make-lsp-client
+;    :new-connection (lsp-stdio-connection '("/usr/local/bin/serve-d"))
+;    :major-modes '(d-mode)
+;    :server-id 'serve-d)))
+
+(add-hook 'd-mode-hook 'eglot-ensure)
+(add-to-list 'eglot-server-programs `(d-mode . ("/usr/local/bin/serve-d")))
+
+(defun org-babel-execute:d 'org-babel-execute:D)
+; Vibe.d uses Diet templates, which are compatible with pug-mode.
+(use-package pug-mode
+  :mode "\\.dt\\'")
+
+(use-package web-mode
+  :mode "\\.ftl\\'")
 
 (message "Checkpoint 2")
 (use-package ess :mode "\\.R\\'")
@@ -105,6 +160,13 @@
 (use-package markdown-mode :mode "\\.md\\'")
 (use-package neotree)
 (require 'ob-plantuml)
+
+;; circe IRC Client configuration
+(autoload 'enable-circe-notifications "circe-notifications" nil t)
+;(eval-after-load "circe-notifications"
+;  '(setq circe-notifications-watch-strings
+;      '("people" "you" "like" "to" "hear" "from")))
+;(add-hook 'circe-server-connected-hook 'enable-circe-notifications)
 
 (message "Checkpoint 3")
 ;; PlantUML Mode
@@ -143,12 +205,13 @@
   :init
   (setq create-lockfiles nil))
 (defun my-rjsx-mode-hook ()
-  (local-set-key (kbd "C-c .") 'lsp-find-definition)
-  (local-set-key (kbd "C-c r") 'lsp-find-references)
+  (flymake-eslint-enable)
   (local-set-key (kbd "C-c /") 'company-complete)
+  (yas-minor-mode)
   )
 (add-hook 'rjsx-mode-hook 'my-rjsx-mode-hook)
-(add-hook 'rjsx-mode-hook 'lsp)
+;(add-hook 'rjsx-mode-hook 'eglot-ensure)
+;(add-hook 'rjsx-mode-hook 'lsp)
 
 ;(use-package w3m)
 
@@ -398,18 +461,43 @@
 ;(setq langtool-language-tool-server-jar "~/opt/LanguageTool-4.7/languagetool-server.jar")
 ;(use-package 'langtool)
 
+;; LSP Mode
+(use-package lsp-mode
+  :hook
+  ((java-mode) . lsp)
+  :config (setq lsp-completion-enable-additional-text-edit nil))
+(use-package company-lsp)
+(use-package lsp-ui :after lsp)
+(use-package lsp-java :after lsp
+  :config (add-hook 'java-mode-hook 'lsp))
+
+;; Python Programming Language Settings
+(defun my/python-mode-hook ()
+  (company-mode)
+  ;(eglot-ensure)
+  ;(local-set-key (kbd "C-c .") 'xref-find-definitions)
+  (local-set-key (kbd "C-c i") 'lsp-java-add-import)
+  (local-set-key (kbd "C-c .") 'lsp-find-definition)
+  (local-set-key (kbd "C-c r") 'lsp-find-references)
+  (local-set-key (kbd "C-c /") 'company-complete)
+  (yas-minor-mode)
+  (setq-local fill-column 100))
+(add-hook 'python-mode-hook 'my/python-mode-hook)
+(add-hook 'python-mode-hook 'lsp)
+; See https://github.com/python-lsp/python-lsp-server
+(add-to-list 'eglot-server-programs `(python-mode . ("~/.local/bin/pylsp")))
+
 ;; Java Programming Language Settings
 ; Settings copied from https://github.com/emacs-lsp/lsp-java
 (require 'cc-mode)
 (message "Checkpoint 12")
-(use-package yasnippet :after lsp :config (yas-global-mode))
-(use-package lsp-mode :config (setq lsp-completion-enable-additional-text-edit nil))
+(use-package yasnippet
+  :after lsp-mode
+  :config
+  (yas-minor-mode)
+  (yas-load-directory (car (yas-snippet-dirs))))
 (use-package hydra)
-(use-package company-lsp)
 (message "Checkpoint 13")
-(use-package lsp-ui :after lsp)
-(use-package lsp-java :after lsp
-  :config (add-hook 'java-mode-hook 'lsp))
 (message "Checkpoint 14")
 (use-package dap-mode :after lsp-mode :config (dap-mode t) (dap-ui-mode t))
 (use-package dap-java :ensure nil :after lsp-java)
@@ -481,11 +569,11 @@
 ;   (local-set-key [?\C-m] 'drools-return-and-indent) )
 
 ;; JSON Pretty Print Function
-(defun json-pretty-print (start end)
-  "Pretty-print the selected region of text."
-  (interactive "r")
-  (shell-command-on-region start end "python -m json.tool" :replace=true)
-)
+;(defun json-pretty-print (start end)
+;  "Pretty-print the selected region of text."
+;  (interactive "r")
+;  (shell-command-on-region start end "python -m json.tool" :replace=true)
+;)
 
 (message "Checkpoint 15")
 ;; EBNF Settings
@@ -525,8 +613,17 @@
 
 ;; Docker
 (message "Checkpoint 17")
-(require 'dockerfile-mode)
-(add-to-list 'auto-mode-alist '("Dockerfile\\'" . dockerfile-mode))
+;(require 'dockerfile-mode)
+;(add-to-list 'auto-mode-alist '("Dockerfile\\'" . dockerfile-mode))
+
+;; Latex and Beamer configuration
+; See https://stackoverflow.com/questions/21005885/export-org-mode-code-block-and-result-with-different-styles
+(require 'ox-latex)
+(add-to-list 'org-latex-packages-alist '("" "minted"))
+(add-to-list 'org-latex-packages-alist '("" "svg"))
+(setq org-latex-listings 'minted)
+(require 'ob-latex)
+
 (message "Checkpoint 18")
 
 ;; W3M Web-Browsing Settings
@@ -569,6 +666,21 @@
 (add-to-list 'ispell-skip-region-alist '("#\\+BEGIN_SRC" . "#\\+END_SRC"))
 (message "Checkpoint 20")
 
+;; W3M Settings
+(defun w3m-copy-url-at-point ()
+  (interactive)
+  (let ((url (w3m-anchor)))
+    (if (w3m-url-valid url)
+  	(kill-new (w3m-anchor))
+      (message "No URL at point!"))))
+
+(add-hook 'w3m-mode-hook
+  (lambda ()
+    (local-set-key "\M-W" 'w3m-copy-url-at-point)))
+
+;; A useful timer utility.
+(use-package egg-timer)
+
 ;; Personal preferences and customizations.
 (setq-default indicate-empty-lines t)
 (put 'dired-find-alternate-file 'disabled nil)
@@ -584,23 +696,28 @@
  '(ag-highlight-search t)
  '(ansi-color-faces-vector
    [default default default italic underline success warning error])
- '(ansi-color-names-vector
-   ["black" "red3" "ForestGreen" "yellow3" "RoyalBlue3" "magenta3" "DeepSkyBlue" "gray50"])
  '(auth-source-save-behavior nil)
  '(bookmark-save-flag 1)
  '(calendar-week-start-day 1)
  '(column-number-mode t)
+ '(company-idle-delay 1.0)
+ '(company-minimum-prefix-length 0)
  '(compilation-auto-jump-to-first-error nil)
+ '(css-indent-offset 2)
  '(custom-enabled-themes '(leuven))
  '(custom-safe-themes
-   '("171d1ae90e46978eb9c342be6658d937a83aaa45997b1d7af7657546cae5985b" "cf9414f229f6df728eb2a5a9420d760673cca404fee9910551caf9c91cff3bfa" "039c01abb72985a21f4423dd480ddb998c57d665687786abd4e16c71128ef6ad" "89885317e7136d4e86fb842605d47d8329320f0326b62efa236e63ed4be23c58" "7922b14d8971cce37ddb5e487dbc18da5444c47f766178e5a4e72f90437c0711" "3cd4f09a44fe31e6dd65af9eb1f10dc00d5c2f1db31a427713a1784d7db7fdfc" "68d8ceaedfb6bdd2909f34b8b51ceb96d7a43f25310a55c701811f427e9de3a3" "672bb062b9c92e62d7c370897b131729c3f7fd8e8de71fc00d70c5081c80048c" "d8dc153c58354d612b2576fea87fe676a3a5d43bcc71170c62ddde4a1ad9e1fb" "732b807b0543855541743429c9979ebfb363e27ec91e82f463c91e68c772f6e3" "a24c5b3c12d147da6cef80938dca1223b7c7f70f2f382b26308eba014dc4833a" "170bb47b35baa3d2439f0fd26b49f4278e9a8decf611aa33a0dad1397620ddc3" "fa2af0c40576f3bde32290d7f4e7aa865eb6bf7ebe31eb9e37c32aa6f4ae8d10" "028de01489a683696c64dcc2a01eaa663670d04202de3fce48ec3a5542bc2da5" "28bf1b0a72e3a1e08242d776c5befc44ba67a36ced0e55df27cfc7ae6be6c24d" "d70c11f5a2b69a77f9d56eff42090138721d4c51d9d39ce986680786d694f492" "ec5f697561eaf87b1d3b087dd28e61a2fc9860e4c862ea8e6b0b77bd4967d0ba" "0c71e4d0b5ad79a7cb155f180adcc93f2fe5ae3d3a863de7d3a8c898087d890c" "2e1e2657303116350fe764484e8300ca2e4cf45a73cdbd879bc0ca29cb337147" "43c1a8090ed19ab3c0b1490ce412f78f157d69a29828aa977dae941b994b4147" "ad9747dc51ca23d1c1382fa9bd5d76e958a5bfe179784989a6a666fe801aadf2" "b04d091b3315afedc67e4e2e9950c272789804cf0cb7e93750d70475a47b935b" "1e7e097ec8cb1f8c3a912d7e1e0331caeed49fef6cff220be63bd2a6ba4cc365" "fc5fcb6f1f1c1bc01305694c59a1a861b008c534cae8d0e48e4d5e81ad718bc6" "aecea99f23d116cd33dabe34b9df808816c374328c064fcf12d15cecc3735237" default))
+   '("f149d9986497e8877e0bd1981d1bef8c8a6d35be7d82cba193ad7e46f0989f6a" "a1b6cc0a437a11d1d2b40cd60b32d248c1c94b0ba2e0934dfc89ea7d3248e782" "aba75724c5d4d0ec0de949694bce5ce6416c132bb031d4e7ac1c4f2dbdd3d580" "90a6f96a4665a6a56e36dec873a15cbedf761c51ec08dd993d6604e32dd45940" "171d1ae90e46978eb9c342be6658d937a83aaa45997b1d7af7657546cae5985b" "cf9414f229f6df728eb2a5a9420d760673cca404fee9910551caf9c91cff3bfa" "039c01abb72985a21f4423dd480ddb998c57d665687786abd4e16c71128ef6ad" "89885317e7136d4e86fb842605d47d8329320f0326b62efa236e63ed4be23c58" "7922b14d8971cce37ddb5e487dbc18da5444c47f766178e5a4e72f90437c0711" "3cd4f09a44fe31e6dd65af9eb1f10dc00d5c2f1db31a427713a1784d7db7fdfc" "68d8ceaedfb6bdd2909f34b8b51ceb96d7a43f25310a55c701811f427e9de3a3" "672bb062b9c92e62d7c370897b131729c3f7fd8e8de71fc00d70c5081c80048c" "d8dc153c58354d612b2576fea87fe676a3a5d43bcc71170c62ddde4a1ad9e1fb" "732b807b0543855541743429c9979ebfb363e27ec91e82f463c91e68c772f6e3" "a24c5b3c12d147da6cef80938dca1223b7c7f70f2f382b26308eba014dc4833a" "170bb47b35baa3d2439f0fd26b49f4278e9a8decf611aa33a0dad1397620ddc3" "fa2af0c40576f3bde32290d7f4e7aa865eb6bf7ebe31eb9e37c32aa6f4ae8d10" "028de01489a683696c64dcc2a01eaa663670d04202de3fce48ec3a5542bc2da5" "28bf1b0a72e3a1e08242d776c5befc44ba67a36ced0e55df27cfc7ae6be6c24d" "d70c11f5a2b69a77f9d56eff42090138721d4c51d9d39ce986680786d694f492" "ec5f697561eaf87b1d3b087dd28e61a2fc9860e4c862ea8e6b0b77bd4967d0ba" "0c71e4d0b5ad79a7cb155f180adcc93f2fe5ae3d3a863de7d3a8c898087d890c" "2e1e2657303116350fe764484e8300ca2e4cf45a73cdbd879bc0ca29cb337147" "43c1a8090ed19ab3c0b1490ce412f78f157d69a29828aa977dae941b994b4147" "ad9747dc51ca23d1c1382fa9bd5d76e958a5bfe179784989a6a666fe801aadf2" "b04d091b3315afedc67e4e2e9950c272789804cf0cb7e93750d70475a47b935b" "1e7e097ec8cb1f8c3a912d7e1e0331caeed49fef6cff220be63bd2a6ba4cc365" "fc5fcb6f1f1c1bc01305694c59a1a861b008c534cae8d0e48e4d5e81ad718bc6" "aecea99f23d116cd33dabe34b9df808816c374328c064fcf12d15cecc3735237" default))
  '(delete-trailing-lines nil)
  '(ecb-options-version "2.40")
+ '(eldoc-echo-area-prefer-doc-buffer t)
  '(even-window-sizes t)
+ '(exec-path
+   '("/home/vnayar/.cargo/bin" "/home/vnayar/.local/bin" "/home/vnayar/bin" "/usr/local/sbin" "/usr/local/bin" "/usr/sbin" "/usr/bin" "/sbin" "/bin" "/usr/games" "/usr/local/games" "/snap/bin" "/usr/local/libexec/emacs/28.1/x86_64-pc-linux-gnu"))
  '(fci-rule-color "#37474f")
  '(fill-column 100)
  '(flycheck-idle-change-delay 2.5)
  '(gcomplete-jump-to-def-binding [ignore])
+ '(gdb-many-windows t)
  '(generic-extras-enable-list
    '(alias-generic-mode apache-conf-generic-mode apache-log-generic-mode etc-fstab-generic-mode etc-modules-conf-generic-mode etc-passwd-generic-mode etc-services-generic-mode etc-sudoers-generic-mode fvwm-generic-mode hosts-generic-mode inetd-conf-generic-mode ini-generic-mode java-manifest-generic-mode java-properties-generic-mode javascript-generic-mode mailagent-rules-generic-mode mailrc-generic-mode named-boot-generic-mode named-database-generic-mode prototype-generic-mode resolve-conf-generic-mode samba-generic-mode show-tabs-generic-mode vrml-generic-mode x-resource-generic-mode xmodmap-generic-mode))
  '(global-auto-revert-mode t)
@@ -626,23 +743,33 @@
  '(lsp-java-completion-guess-method-arguments t)
  '(lsp-java-completion-import-order [])
  '(lsp-java-vmargs
-   '("-noverify" "-Xmx1G" "-XX:+UseG1GC" "-XX:+UseStringDeduplication" "-javaagent:/home/vnayar/.m2/repository/org/projectlombok/lombok/1.18.12/lombok-1.18.12.jar"))
- '(lsp-ui-doc-delay 0.8)
+   '("-noverify" "-Xmx1G" "-XX:+UseG1GC" "-XX:+UseStringDeduplication" "-javaagent:/home/vnayar/.m2/repository/org/projectlombok/lombok/1.18.24/lombok-1.18.24.jar"))
+ '(lsp-ui-doc-delay 2.0)
+ '(lsp-ui-doc-show-with-cursor nil)
  '(lsp-ui-sideline-enable nil)
  '(org-ac/ac-trigger-command-keys nil)
  '(org-adapt-indentation 'headline-data)
  '(org-babel-load-languages
-   '((emacs-lisp . t)
+   '((d . t)
+     (emacs-lisp . t)
      (plantuml . t)
      (shell . t)
      (js . t)
-     (R . t)))
+     (R . t)
+     (latex . t)))
  '(org-clock-clocked-in-display 'frame-title)
+ '(org-clock-sound t)
  '(org-duration-format 'h:mm)
  '(org-edit-src-content-indentation 0)
+ '(org-export-backends '(ascii beamer html latex md odt))
  '(org-export-with-sub-superscripts '{})
+ '(org-format-latex-options
+   '(:foreground default :background default :scale 1.4 :html-foreground "Black" :html-background "Transparent" :html-scale 1.0 :matchers
+                 ("begin" "$1" "$" "$$" "\\(" "\\[")))
  '(org-indent-indentation-per-level 2)
  '(org-latex-image-default-width "1.2\\linewidth")
+ '(org-latex-pdf-process
+   '("%latex -shell-escape -interaction nonstopmode -output-directory %o %f" "%latex -shell-escape -interaction nonstopmode -output-directory %o %f" "%latex -shell-escape -interaction nonstopmode -output-directory %o %f"))
  '(org-link-file-path-type 'relative)
  '(org-list-description-max-indent 4)
  '(org-odt-create-custom-styles-for-srcblocks t)
@@ -652,9 +779,11 @@
    '(:hours "%d" :require-hours t :minutes ":%02d" :require-minutes t))
  '(org-todo-keywords '((sequence "TODO" "WAIT" "DONE")))
  '(package-selected-packages
-   '(d-mode atom-one-dark-theme tron-legacy-theme lsp-dart dart-mode adoc-mode lsp-java protobuf-mode csv csv-mode lsp-mode dap-mode lsp-treemacs lsp-ui posframe ag dockerfile-mode w3m rjsx-mode typescript-mode groovy-mode magit flycheck-plantuml terraform-doc terraform-mode flycheck-d-unittest gnu-elpa-keyring-update company-lsp abyss-theme gh-md material-theme unicode-math-input sdlang-mode gnuplot-mode w3 top-mode sr-speedbar peg ox-mediawiki ox-gfm org-ac nyx-theme neotree java-snippets grizzl gradle-mode google-c-style git ggtags fuzzy eproject company-dcd column-marker color-theme-buffer-local apache-mode ac-rtags ac-js2 ac-alchemist))
+   '(org bm tikz circe circe-notifications flymake-eslint bnf-mode treemacs lsp-treemacs js2-mode react-snippets swift-mode web-mode pug-mode go-mode d-mode bazel eglot jedi yaml-mode egg-timer tea-time bison-mode rust-mode atom-one-dark-theme tron-legacy-theme lsp-dart dart-mode adoc-mode lsp-java protobuf-mode csv csv-mode lsp-mode dap-mode lsp-ui posframe ag w3m rjsx-mode typescript-mode groovy-mode magit flycheck-plantuml terraform-doc terraform-mode flycheck-d-unittest gnu-elpa-keyring-update company-lsp abyss-theme gh-md material-theme unicode-math-input sdlang-mode gnuplot-mode w3 top-mode sr-speedbar peg ox-mediawiki ox-gfm org-ac nyx-theme neotree java-snippets grizzl gradle-mode google-c-style git ggtags fuzzy company-dcd column-marker color-theme-buffer-local apache-mode ac-rtags ac-js2 ac-alchemist))
  '(peg-mode-hook '(my-peg-mode-hook))
  '(plantuml-indent-level 2)
+ '(preview-TeX-style-dir "/home/vnayar/.emacs.d/elpa/auctex-13.0.16/latex" t)
+ '(preview-scale-function 1.4)
  '(projectile-completion-system 'ido)
  '(rtags-install-path nil)
  '(rtags-path "~/src/rtags/bin")
@@ -662,6 +791,7 @@
  '(scroll-bar-mode nil)
  '(show-paren-mode t)
  '(tool-bar-mode nil)
+ '(treemacs-width 30)
  '(vc-annotate-background nil)
  '(vc-annotate-color-map
    '((20 . "#f36c60")
@@ -683,6 +813,7 @@
      (340 . "#fff59d")
      (360 . "#8bc34a")))
  '(vc-annotate-very-old-color nil)
+ '(warning-suppress-types '((use-package) (lsp-mode)))
  '(web-mode-code-indent-offset 2)
  '(web-mode-css-indent-offset 2)
  '(web-mode-markup-indent-offset 2))
@@ -692,6 +823,7 @@
  ;; Your init file should contain only one such instance.
  ;; If there is more than one, they won't work right.
  '(default ((t (:inherit nil :extend nil :stipple nil :inverse-video nil :box nil :strike-through nil :overline nil :underline nil :slant normal :weight normal :height 100 :width normal :foundry "SRC" :family "Noto Sans Mono"))))
+ '(circe-server-face ((t (:foreground "dodger blue"))))
  '(lsp-lsp-flycheck-warning-unnecessary-face ((t (:underline (:color "#F4A939" :style wave) :weight bold))) t)
  '(web-mode-html-tag-face ((t (:foreground "steel blue")))))
 (message "Checkpoint 21")
